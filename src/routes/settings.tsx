@@ -149,17 +149,37 @@ function UnitDashboard({ unitId }: { unitId: string }) {
   const unitProjects = projects?.filter(p => p.unit_id === unitId) || [];
 
   const create = useServerFn(createProject);
+  const remove = useServerFn(deleteProject);
   const qc = useQueryClient();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | false>(false);
 
   const handleCreateProject = async () => {
     try {
-      setBusy(true);
+      setBusy("creating");
       await create({ data: { title: "โครงการใหม่", unitId } });
       toast.success("สร้างโครงการสำเร็จ!");
       qc.invalidateQueries({ queryKey: ["all-projects"] });
     } catch (e: any) {
       toast.error("สร้างไม่สำเร็จ: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDeleteProject = async (e: React.MouseEvent, projectId: string, title: string) => {
+    e.stopPropagation();
+    if (!window.confirm(`ยืนยันการลบโครงการ "${title}"?`)) return;
+    setBusy(projectId);
+    try {
+      const r = await remove({ data: { id: projectId } });
+      if (r.ok) {
+        toast.success("ลบโครงการแล้ว");
+        qc.invalidateQueries({ queryKey: ["all-projects"] });
+      } else {
+        toast.error("ไม่มีสิทธิ์ลบ");
+      }
+    } catch {
+      toast.error("เกิดข้อผิดพลาด");
     } finally {
       setBusy(false);
     }
@@ -186,10 +206,10 @@ function UnitDashboard({ unitId }: { unitId: string }) {
           <div>
             <h1 className="font-display text-3xl font-semibold tracking-tight">หน่วยบริการ: {unit?.name || "กำลังโหลด..."}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              จัดการโครงการก่อสร้างทั้งหมดของหน่วยบริการนี้
+              คลิกที่โครงการเพื่อจัดการรายละเอียด ปฏิทิน และรายงาน
             </p>
           </div>
-          <Button onClick={handleCreateProject} disabled={busy}>
+          <Button onClick={handleCreateProject} disabled={busy === "creating"}>
             <Plus className="mr-2 h-4 w-4" /> เพิ่มโครงการใหม่
           </Button>
         </div>
@@ -200,24 +220,49 @@ function UnitDashboard({ unitId }: { unitId: string }) {
           ) : unitProjects.length === 0 ? (
             <div className="text-center py-10">
               <p className="text-muted-foreground mb-4">ยังไม่มีโครงการในหน่วยบริการนี้</p>
-              <Button onClick={handleCreateProject} variant="outline" disabled={busy}>
+              <Button onClick={handleCreateProject} variant="outline" disabled={!!busy}>
                 สร้างโครงการแรก
               </Button>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               {unitProjects.map(p => (
-                <div key={p.id} className="rounded-xl border p-5 flex flex-col gap-4 hover:border-brand transition-colors cursor-pointer" onClick={() => setSelectedProjectId(p.id)}>
-                  <div>
-                    <h3 className="font-medium text-lg">{p.title || "โครงการไม่มีชื่อ"}</h3>
-                    <p className="text-sm text-muted-foreground">{p.subtitle || "-"}</p>
+                <div
+                  key={p.id}
+                  className="rounded-xl border p-5 flex flex-col gap-3 hover:border-brand hover:shadow-md transition-all cursor-pointer relative"
+                  onClick={() => setSelectedProjectId(p.id)}
+                >
+                  {/* Delete button */}
+                  <button
+                    className="absolute top-3 right-3 p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    onClick={(e) => handleDeleteProject(e, p.id, p.title || "โครงการนี้")}
+                    disabled={busy === p.id}
+                    title="ลบโครงการ"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+
+                  <div className="pr-8">
+                    <h3 className="font-semibold text-base leading-tight">{p.title || "โครงการไม่มีชื่อ"}</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">{p.subtitle || "ยังไม่มีคำอธิบาย"}</p>
                   </div>
-                  <div className="flex items-center justify-between mt-auto pt-4 border-t">
+
+                  <div className="mt-auto">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs text-muted-foreground">ความคืบหน้า</span>
+                      <span className="text-xs font-bold text-brand">{p.total_progress}%</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-brand rounded-full" style={{ width: `${p.total_progress}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 border-t">
                     <span className="text-xs text-muted-foreground">
-                      งบ: {p.budget_baht ? p.budget_baht.toLocaleString() : 0} บ.
+                      งบประมาณ: {p.budget_baht ? p.budget_baht.toLocaleString() : "-"} บ.
                     </span>
-                    <span className="text-xs font-medium text-brand">
-                      คืบหน้า: {p.total_progress}%
+                    <span className="text-xs font-medium text-brand hover:underline">
+                      จัดการ →
                     </span>
                   </div>
                 </div>
