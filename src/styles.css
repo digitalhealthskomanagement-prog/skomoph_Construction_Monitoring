@@ -1,0 +1,120 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "IBM Plex Sans Thai", "Sarabun", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "IBM Plex Sans Thai Looped", "IBM Plex Sans Thai", "Sarabun", ui-sans-serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-soft: var(--brand-soft);
+  --color-gold: var(--gold);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.985 0.008 95);
+  --foreground: oklch(0.22 0.03 180);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.03 180);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.03 180);
+  --primary: oklch(0.36 0.06 185);
+  --primary-foreground: oklch(0.985 0.005 95);
+  --secondary: oklch(0.94 0.02 170);
+  --secondary-foreground: oklch(0.28 0.05 185);
+  --muted: oklch(0.95 0.012 90);
+  --muted-foreground: oklch(0.48 0.02 180);
+  --accent: oklch(0.92 0.05 170);
+  --accent-foreground: oklch(0.28 0.05 185);
+  --destructive: oklch(0.6 0.22 27);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.9 0.015 170);
+  --input: oklch(0.92 0.012 170);
+  --ring: oklch(0.5 0.09 185);
+  --brand: oklch(0.42 0.08 185);
+  --brand-foreground: oklch(0.98 0.005 95);
+  --brand-soft: oklch(0.93 0.04 175);
+  --gold: oklch(0.75 0.13 75);
+  --chart-1: oklch(0.42 0.08 185);
+  --chart-2: oklch(0.65 0.11 170);
+  --chart-3: oklch(0.75 0.13 75);
+  --chart-4: oklch(0.6 0.16 30);
+  --chart-5: oklch(0.55 0.14 285);
+}
+
+.dark {
+  --background: oklch(0.16 0.02 185);
+  --foreground: oklch(0.96 0.01 90);
+  --card: oklch(0.22 0.025 185);
+  --card-foreground: oklch(0.96 0.01 90);
+  --popover: oklch(0.22 0.025 185);
+  --popover-foreground: oklch(0.96 0.01 90);
+  --primary: oklch(0.75 0.12 175);
+  --primary-foreground: oklch(0.18 0.02 185);
+  --secondary: oklch(0.28 0.03 185);
+  --secondary-foreground: oklch(0.96 0.01 90);
+  --muted: oklch(0.26 0.02 185);
+  --muted-foreground: oklch(0.7 0.02 170);
+  --accent: oklch(0.32 0.05 175);
+  --accent-foreground: oklch(0.96 0.01 90);
+  --destructive: oklch(0.65 0.2 27);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.3 0.02 185);
+  --input: oklch(0.3 0.02 185);
+  --ring: oklch(0.7 0.1 175);
+  --brand: oklch(0.7 0.12 175);
+  --brand-foreground: oklch(0.18 0.02 185);
+  --brand-soft: oklch(0.3 0.05 175);
+  --gold: oklch(0.8 0.14 80);
+  --chart-1: oklch(0.7 0.12 175);
+  --chart-2: oklch(0.75 0.11 155);
+  --chart-3: oklch(0.8 0.14 80);
+  --chart-4: oklch(0.7 0.16 30);
+  --chart-5: oklch(0.7 0.14 285);
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  html { font-family: var(--font-sans); }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    background-image:
+      radial-gradient(1200px 600px at 10% -10%, oklch(0.94 0.04 175 / 0.6), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, oklch(0.94 0.06 80 / 0.5), transparent 60%);
+    background-attachment: fixed;
+  }
+  .font-display { font-family: var(--font-display); font-feature-settings: "ss01"; }
+}

@@ -1,0 +1,1 @@
+ALTER TABLE public.updates ADD COLUMN IF NOT EXISTS thumb_urls text[] NOT NULL DEFAULT '{}';
