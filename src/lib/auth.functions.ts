@@ -26,7 +26,7 @@ export const setSessionCookie = createServerFn({ method: "POST" })
       .single();
 
     // Auto-assign admin if missing and email matches
-    if (!roleData?.role && user.email === "digitalhealthsko.management@gmail.com") {
+    if (!roleData?.role && (user.email === "digitalhealthsko.management@gmail.com" || user.email === "admin@skomoph.local")) {
       const { data: newRole } = await supabaseAdmin.from("user_roles").insert({
         user_id: user.id,
         role: "super_admin",

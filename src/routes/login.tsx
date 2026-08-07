@@ -27,7 +27,7 @@ function Login() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const setSession = useServerFn(setSessionCookie);
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -35,13 +35,14 @@ function Login() {
     e.preventDefault();
     setBusy(true);
     try {
+      const emailToUse = username.includes("@") ? username : `${username}@skomoph.local`;
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: emailToUse,
         password,
       });
 
       if (error) {
-        toast.error("อีเมลหรือรหัสผ่านไม่ถูกต้อง");
+        toast.error("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
         return;
       }
 
@@ -73,14 +74,14 @@ function Login() {
         </p>
         <form onSubmit={submit} className="mt-8 w-full space-y-4 rounded-2xl border bg-card p-6 shadow-sm">
           <div className="grid gap-2">
-            <Label htmlFor="email">อีเมล</Label>
+            <Label htmlFor="username">ชื่อผู้ใช้ (Username)</Label>
             <Input
-              id="email"
-              type="email"
+              id="username"
+              type="text"
               autoFocus
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@example.com"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="เช่น admin หรือเบอร์โทรศัพท์"
             />
           </div>
           <div className="grid gap-2">
@@ -93,7 +94,7 @@ function Login() {
               placeholder="••••••••"
             />
           </div>
-          <Button type="submit" disabled={busy || !password || !email} className="w-full bg-brand text-brand-foreground hover:bg-brand/90">
+          <Button type="submit" disabled={busy || !password || !username} className="w-full bg-brand text-brand-foreground hover:bg-brand/90">
             <KeyRound className="mr-1.5 size-4" /> {busy ? "กำลังตรวจสอบ…" : "เข้าสู่ระบบ"}
           </Button>
           <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground pt-4">

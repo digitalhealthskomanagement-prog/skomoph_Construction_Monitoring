@@ -28,8 +28,9 @@ function Register() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const setSession = useServerFn(setSessionCookie);
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [projectId, setProjectId] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -52,12 +53,17 @@ function Register() {
       toast.error("กรุณาเลือกหน่วยบริการ");
       return;
     }
+    if (password !== confirmPassword) {
+      toast.error("รหัสผ่านไม่ตรงกัน");
+      return;
+    }
     
     setBusy(true);
     try {
       // 1. Sign up
+      const emailToUse = username.includes("@") ? username : `${username}@skomoph.local`;
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
+        email: emailToUse,
         password,
       });
 
@@ -120,15 +126,15 @@ function Register() {
         </p>
         <form onSubmit={submit} className="mt-8 w-full space-y-4 rounded-2xl border bg-card p-6 shadow-sm">
           <div className="grid gap-2">
-            <Label htmlFor="email">อีเมล</Label>
+            <Label htmlFor="username">ชื่อผู้ใช้ (Username)</Label>
             <Input
-              id="email"
-              type="email"
+              id="username"
+              type="text"
               autoFocus
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@example.com"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="เช่น admin หรือเบอร์โทรศัพท์"
             />
           </div>
           <div className="grid gap-2">
@@ -141,6 +147,18 @@ function Register() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="อย่างน้อย 6 ตัวอักษร"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="confirmPassword">ยืนยันรหัสผ่าน</Label>
+            <Input
+              id="confirmPassword"
+              type="password"
+              required
+              minLength={6}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="กรอกรหัสผ่านอีกครั้ง"
             />
           </div>
           <div className="grid gap-2">
@@ -159,7 +177,7 @@ function Register() {
               </SelectContent>
             </Select>
           </div>
-          <Button type="submit" disabled={busy || !password || !email || !projectId} className="w-full mt-2 bg-brand text-brand-foreground hover:bg-brand/90">
+          <Button type="submit" disabled={busy || !password || !confirmPassword || !username || !projectId} className="w-full mt-2 bg-brand text-brand-foreground hover:bg-brand/90">
             <KeyRound className="mr-1.5 size-4" /> {busy ? "กำลังดำเนินการ…" : "สร้างบัญชีผู้ใช้"}
           </Button>
           <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground pt-4">
