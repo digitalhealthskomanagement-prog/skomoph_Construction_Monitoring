@@ -19,11 +19,23 @@ export const setSessionCookie = createServerFn({ method: "POST" })
     }
 
     // Fetch role
-    const { data: roleData } = await supabaseAdmin
+    let { data: roleData } = await supabaseAdmin
       .from("user_roles")
       .select("role, project_id")
       .eq("user_id", user.id)
       .single();
+
+    // Auto-assign admin if missing and email matches
+    if (!roleData?.role && user.email === "digitalhealthsko.management@gmail.com") {
+      const { data: newRole } = await supabaseAdmin.from("user_roles").insert({
+        user_id: user.id,
+        role: "super_admin",
+        project_id: null
+      }).select().single();
+      if (newRole) {
+        roleData = newRole;
+      }
+    }
 
     const session = await getSession();
     await session.update({
