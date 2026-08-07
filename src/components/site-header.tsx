@@ -1,6 +1,5 @@
 import { Link, useRouter } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { projectQuery, type ProjectSettings } from "@/lib/project-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { KeyRound, LogOut, Settings2 } from "lucide-react";
 import hospitalLogo from "@/assets/hospital-logo.png";
 import { Button } from "@/components/ui/button";
@@ -12,9 +11,8 @@ export function SiteHeader() {
   const { data } = useAuthStatus();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: project } = useQuery(projectQuery);
-  const settings = (project?.settings ?? null) as ProjectSettings | null;
   const unlocked = data?.unlocked;
+  const isSuperAdmin = data?.role === "super_admin";
 
   async function onLock() {
     await supabase.auth.signOut();
@@ -31,22 +29,24 @@ export function SiteHeader() {
         <Link to="/" className="flex items-center gap-3">
           <img src={hospitalLogo} alt="โลโก้หน่วยงาน" width={48} height={48} className="size-12 rounded-xl bg-white object-contain p-1 shadow-sm ring-1 ring-border" />
           <div className="leading-tight">
-            <div className="font-display text-base font-semibold tracking-tight">{settings?.org_name ?? "ชื่อหน่วยงาน"}</div>
-            <div className="text-xs text-muted-foreground">{settings?.org_tagline ?? settings?.title ?? "โครงการก่อสร้าง"}</div>
+            <div className="font-display text-base font-semibold tracking-tight">สำนักงานสาธารณสุขจังหวัดสระแก้ว</div>
+            <div className="text-xs text-muted-foreground">ระบบติดตามความคืบหน้างานก่อสร้าง</div>
           </div>
         </Link>
         <nav className="flex items-center gap-1 sm:gap-2">
           <Link to="/" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground" activeOptions={{ exact: true }} activeProps={{ className: "text-foreground" }}>
             หน้าแรก
           </Link>
-          <Link to="/updates" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground" activeProps={{ className: "text-foreground" }}>
-            รายงานอัปเดต
-          </Link>
           {unlocked ? (
             <div className="ml-2 flex items-center gap-2">
               <Link to="/settings" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground" activeProps={{ className: "text-foreground" }}>
                 <span className="inline-flex items-center gap-1.5"><Settings2 className="size-4" /> ตั้งค่า</span>
               </Link>
+              {isSuperAdmin && (
+                <Link to="/admin/users" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground" activeProps={{ className: "text-foreground" }}>
+                  <span className="inline-flex items-center gap-1.5">จัดการผู้ใช้</span>
+                </Link>
+              )}
               <span className="hidden rounded-full border border-brand/20 bg-brand-soft px-2.5 py-1 text-xs font-medium text-primary sm:inline-flex">
                 โหมดแก้ไข
               </span>

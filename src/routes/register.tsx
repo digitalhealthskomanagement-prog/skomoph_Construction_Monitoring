@@ -73,10 +73,11 @@ function Register() {
 
       if (authData.user) {
         // 2. Insert into user_roles
+        const isSsj = projectId === "b7e842b7-f646-4d47-8f82-829a862b3a3f";
         const rolePayload = {
           user_id: authData.user.id,
-          project_id: projectId === "admin" ? null : projectId,
-          role: projectId === "admin" ? "super_admin" : "unit_admin",
+          project_id: projectId,
+          role: isSsj ? "super_admin" : "unit_admin",
         };
         
         const { error: roleError } = await supabase
@@ -98,8 +99,8 @@ function Register() {
             ...old,
             unlocked: true,
             userId: authData.user?.id,
-            role: projectId === "admin" ? "super_admin" : "unit_admin",
-            projectId: projectId === "admin" ? null : projectId,
+            role: isSsj ? "super_admin" : "unit_admin",
+            projectId: projectId,
           }));
         }
         
@@ -167,7 +168,6 @@ function Register() {
                 <SelectValue placeholder={projectsLoading ? "กำลังโหลด..." : "เลือกหน่วยบริการ..."} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="admin">สำนักงานสาธารณสุขจังหวัดสระแก้ว (สสจ.)</SelectItem>
                 {projects?.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.unit_name || p.title}
