@@ -24,13 +24,15 @@ export const getAllUsers = createServerFn({ method: "GET" })
 
     // 4. Combine data
     const users = authData.users.map(u => {
-      const roleInfo = rolesData.find(r => r.user_id === u.id);
+      const userRoles = rolesData.filter(r => r.user_id === u.id);
+      const role = userRoles.some(r => r.role === "super_admin") ? "super_admin" : (userRoles.length > 0 ? "unit_admin" : null);
+      const projectIds = userRoles.map(r => r.project_id).filter(Boolean);
       return {
         id: u.id,
         email: u.email,
         created_at: u.created_at,
-        role: roleInfo?.role || null,
-        project_id: roleInfo?.project_id || null,
+        role: role,
+        project_ids: projectIds,
       };
     });
 
@@ -41,7 +43,7 @@ export const updateUserRole = createServerFn({ method: "POST" })
   .inputValidator(z.object({
     userId: z.string(),
     role: z.enum(["super_admin", "unit_admin"]),
-    projectId: z.string().nullable(),
+    projectIds: z.array(z.string()).default([]),
   }))
   .handler(async ({ data }) => {
     const { getAuthContext } = await import("./auth.server");
@@ -53,25 +55,27 @@ export const updateUserRole = createServerFn({ method: "POST" })
       throw new Error("Unauthorized");
     }
 
-    // 2. Check if role exists
-    const { data: existingRole } = await supabaseAdmin
+    // 2. Delete existing roles
+    await supabaseAdmin
       .from("user_roles")
-      .select("id")
-      .eq("user_id", data.userId)
-      .single();
+      .delete()
+      .eq("user_id", data.userId);
 
-    if (existingRole) {
-      // Update
+    // 3. Insert new roles
+    if (data.role === "super_admin" || data.projectIds.length === 0) {
       const { error } = await supabaseAdmin
         .from("user_roles")
-        .update({ role: data.role, project_id: data.projectId })
-        .eq("user_id", data.userId);
+        .insert({ user_id: data.userId, role: data.role, project_id: null });
       if (error) throw new Error(error.message);
     } else {
-      // Insert
+      const inserts = data.projectIds.map(pid => ({
+        user_id: data.userId,
+        role: data.role,
+        project_id: pid
+      }));
       const { error } = await supabaseAdmin
         .from("user_roles")
-        .insert({ user_id: data.userId, role: data.role, project_id: data.projectId });
+        .insert(inserts);
       if (error) throw new Error(error.message);
     }
 

@@ -18,22 +18,33 @@ export const setSessionCookie = createServerFn({ method: "POST" })
       return { ok: false as const, error: "Invalid token" };
     }
 
-    // Fetch role
-    let { data: roleData } = await supabaseAdmin
+    // Fetch all roles for user
+    let { data: roleDataArray } = await supabaseAdmin
       .from("user_roles")
       .select("role, project_id")
-      .eq("user_id", user.id)
-      .single();
+      .eq("user_id", user.id);
+
+    let role = null;
+    let projectIds: string[] = [];
+    
+    if (roleDataArray && roleDataArray.length > 0) {
+      if (roleDataArray.some(r => r.role === "super_admin")) {
+        role = "super_admin";
+      } else {
+        role = "unit_admin";
+        projectIds = roleDataArray.map(r => r.project_id).filter(Boolean) as string[];
+      }
+    }
 
     // Auto-assign admin if missing and email matches
-    if (!roleData?.role && (user.email === "digitalhealthsko.management@gmail.com" || user.email === "admin@skomoph.local")) {
+    if (!role && (user.email === "digitalhealthsko.management@gmail.com" || user.email === "admin@skomoph.local")) {
       const { data: newRole } = await supabaseAdmin.from("user_roles").insert({
         user_id: user.id,
         role: "super_admin",
         project_id: null
       }).select().single();
       if (newRole) {
-        roleData = newRole;
+        role = "super_admin";
       }
     }
 
@@ -41,8 +52,9 @@ export const setSessionCookie = createServerFn({ method: "POST" })
     await session.update({
       unlocked: true,
       userId: user.id,
-      role: roleData?.role || null,
-      projectId: roleData?.project_id || null,
+      role: role,
+      projectId: projectIds.length > 0 ? projectIds[0] : null,
+      projectIds: projectIds,
     });
 
     return { ok: true as const };
@@ -63,7 +75,8 @@ export const getAuthStatus = createServerFn({ method: "GET" }).handler(
       unlocked: ctx.unlocked,
       userId: ctx.userId,
       role: ctx.role,
-      projectId: ctx.projectId
+      projectId: ctx.projectId,
+      projectIds: ctx.projectIds
     };
   }
 );

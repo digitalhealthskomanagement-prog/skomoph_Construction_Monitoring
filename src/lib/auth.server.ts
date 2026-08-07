@@ -5,6 +5,7 @@ export type AuthSession = {
   userId?: string;
   role?: "super_admin" | "unit_admin" | null;
   projectId?: string | null;
+  projectIds?: string[];
 };
 
 function cookieOptions() {
@@ -39,5 +40,6 @@ export async function getAuthContext() {
     userId: session.data.userId,
     role: session.data.role,
     projectId: session.data.projectId,
+    projectIds: session.data.projectIds || [],
   };
 }

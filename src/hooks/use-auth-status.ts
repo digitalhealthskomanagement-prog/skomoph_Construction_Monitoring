@@ -8,6 +8,7 @@ export type AuthStatus = {
   userId?: string | null;
   role?: 'super_admin' | 'unit_admin' | null;
   projectId?: string | null;
+  projectIds?: string[];
 };
 
 export function useAuthStatus() {

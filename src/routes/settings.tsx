@@ -65,11 +65,65 @@ function SettingsRouter() {
     return <SuperAdminDashboard />;
   }
 
-  if (auth.role === "unit_admin" && auth.projectId) {
-    return <UnitSettingsPage projectId={auth.projectId} />;
+  if (auth.role === "unit_admin" && auth.projectIds && auth.projectIds.length > 0) {
+    if (auth.projectIds.length === 1) {
+      return <UnitSettingsPage projectId={auth.projectIds[0]} />;
+    } else {
+      return <UnitProjectSelector projectIds={auth.projectIds} />;
+    }
   }
 
   return <div className="p-8 text-center">คุณไม่มีสิทธิ์เข้าถึงหน้านี้ หรือไม่ได้ผูกกับหน่วยบริการใด</div>;
+}
+
+function UnitProjectSelector({ projectIds }: { projectIds: string[] }) {
+  const { data: projects, isLoading } = useQuery(allProjectsQuery);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
+  if (selectedProjectId) {
+    return (
+      <div>
+        <div className="bg-muted/50 p-3 flex items-center justify-between">
+          <Button variant="ghost" onClick={() => setSelectedProjectId(null)}>
+            &larr; กลับไปเลือกโครงการอื่น
+          </Button>
+        </div>
+        <UnitSettingsPage projectId={selectedProjectId} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen">
+      <SiteHeader />
+      <main className="mx-auto max-w-4xl space-y-8 px-4 py-10 sm:px-6">
+        <div>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">เลือกโครงการที่ต้องการจัดการ</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            บัญชีของคุณได้รับสิทธิ์ดูแลหลายโครงการ กรุณาเลือกโครงการที่ต้องการตั้งค่า
+          </p>
+        </div>
+        
+        <Card className="p-5">
+          {isLoading ? (
+            <p>กำลังโหลด...</p>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {projects?.filter(p => projectIds.includes(p.id)).map(p => (
+                <div key={p.id} className="rounded-xl border p-5 flex flex-col gap-4 hover:border-brand transition-colors cursor-pointer" onClick={() => setSelectedProjectId(p.id)}>
+                  <div>
+                    <h3 className="font-medium text-lg">{p.title || p.unit_name}</h3>
+                    <p className="text-sm text-muted-foreground">{p.unit_name}</p>
+                  </div>
+                  <Button className="w-full mt-auto" variant="outline">จัดการโครงการนี้</Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </main>
+    </div>
+  );
 }
 
 /* ---------- Super Admin Dashboard ---------- */

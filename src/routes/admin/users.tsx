@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -95,7 +96,7 @@ function AdminUsersPage() {
           </TableHeader>
           <TableBody>
             {usersData?.users.map((user) => {
-              const project = projectsData?.find(p => p.id === user.project_id);
+              const assignedProjects = projectsData?.filter(p => user.project_ids?.includes(p.id)) || [];
               return (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.email}</TableCell>
@@ -109,7 +110,15 @@ function AdminUsersPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {project ? project.unit_name : <span className="text-muted-foreground">-</span>}
+                    {assignedProjects.length > 0 ? (
+                      <div className="flex flex-wrap gap-1 max-w-[200px]">
+                        {assignedProjects.map(p => (
+                          <span key={p.id} className="text-xs bg-muted px-2 py-0.5 rounded-full whitespace-nowrap">
+                            {p.unit_name}
+                          </span>
+                        ))}
+                      </div>
+                    ) : <span className="text-muted-foreground">-</span>}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
                     {new Date(user.created_at).toLocaleDateString("th-TH")}
@@ -152,7 +161,13 @@ function AdminUsersPage() {
 
 function EditUserDialog({ user, projects, isOpen, onClose, onSave, isPending }: any) {
   const [role, setRole] = useState(user.role || "unit_admin");
-  const [projectId, setProjectId] = useState(user.project_id || "none");
+  const [projectIds, setProjectIds] = useState<string[]>(user.project_ids || []);
+
+  const toggleProject = (id: string) => {
+    setProjectIds(prev => 
+      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+    );
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -181,22 +196,29 @@ function EditUserDialog({ user, projects, isOpen, onClose, onSave, isPending }: 
 
           <div className="grid gap-2">
             <Label>หน่วยบริการที่ดูแล (สำหรับ Unit Admin)</Label>
-            <Select value={projectId} onValueChange={setProjectId} disabled={role === "super_admin"}>
-              <SelectTrigger>
-                <SelectValue placeholder="เลือกหน่วยบริการ" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">- ไม่ระบุ -</SelectItem>
+            {role === "super_admin" ? (
+              <div className="text-sm text-muted-foreground italic">Super Admin มีสิทธิ์เข้าถึงทุกหน่วยบริการ</div>
+            ) : (
+              <div className="border rounded-md p-3 max-h-[200px] overflow-y-auto space-y-2">
                 {projects.map((p: any) => (
-                  <SelectItem key={p.id} value={p.id}>{p.unit_name}</SelectItem>
+                  <div key={p.id} className="flex items-center space-x-2">
+                    <Checkbox 
+                      id={`project-${p.id}`} 
+                      checked={projectIds.includes(p.id)}
+                      onCheckedChange={() => toggleProject(p.id)}
+                    />
+                    <Label htmlFor={`project-${p.id}`} className="text-sm font-normal cursor-pointer leading-none">
+                      {p.unit_name || p.title}
+                    </Label>
+                  </div>
                 ))}
-              </SelectContent>
-            </Select>
+              </div>
+            )}
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isPending}>ยกเลิก</Button>
-          <Button onClick={() => onSave({ role, projectId: projectId === "none" ? null : projectId })} disabled={isPending}>
+          <Button onClick={() => onSave({ role, projectIds: role === "super_admin" ? [] : projectIds })} disabled={isPending}>
             {isPending ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
           </Button>
         </DialogFooter>
