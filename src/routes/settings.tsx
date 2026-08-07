@@ -229,8 +229,7 @@ function UnitDashboard({ unitId }: { unitId: string }) {
               {unitProjects.map(p => (
                 <div
                   key={p.id}
-                  className="rounded-xl border p-5 flex flex-col gap-3 hover:border-brand hover:shadow-md transition-all cursor-pointer relative"
-                  onClick={() => setSelectedProjectId(p.id)}
+                  className="rounded-xl border p-5 flex flex-col gap-3 hover:border-brand hover:shadow-md transition-all relative"
                 >
                   {/* Delete button */}
                   <button
@@ -257,16 +256,24 @@ function UnitDashboard({ unitId }: { unitId: string }) {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-3 border-t">
-                    <span className="text-xs text-muted-foreground">
-                      งบประมาณ: {p.budget_baht ? p.budget_baht.toLocaleString() : "-"} บ.
-                    </span>
-                    <span className="text-xs font-medium text-brand hover:underline">
-                      จัดการ →
-                    </span>
+                  <div className="flex items-center gap-2 pt-3 border-t">
+                    <Link
+                      to="/projects/$projectId"
+                      params={{ projectId: p.id }}
+                      className="flex-1 text-center text-xs font-medium py-1.5 px-3 rounded-lg bg-brand text-brand-foreground hover:bg-brand/90 transition-colors"
+                    >
+                      📊 ดูหน้าโครงการ
+                    </Link>
+                    <button
+                      onClick={() => setSelectedProjectId(p.id)}
+                      className="flex-1 text-center text-xs font-medium py-1.5 px-3 rounded-lg border hover:bg-muted transition-colors"
+                    >
+                      ⚙️ ตั้งค่า / รายงาน
+                    </button>
                   </div>
                 </div>
               ))}
+
             </div>
           )}
         </Card>

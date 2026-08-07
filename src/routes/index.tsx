@@ -16,9 +16,8 @@ export const Route = createFileRoute("/")({
 function DashboardComponent() {
   const { data: allProjects } = useSuspenseQuery(allProjectsQuery);
   
-  // Filter active projects (must be active AND have either budget or progress)
-  // This hides all empty seed projects
-  const activeProjects = allProjects.filter((p) => p.is_active && (p.budget_baht !== null || p.total_progress > 0));
+  // Filter active projects only (is_active = true)
+  const activeProjects = allProjects.filter((p) => p.is_active);
 
   // --- Calculate Dashboard Stats ---
   const totalBudget = activeProjects.reduce((sum, p) => sum + (p.budget_baht || 0), 0);
