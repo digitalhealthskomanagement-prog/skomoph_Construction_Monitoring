@@ -56,7 +56,8 @@ async function signImages(paths: string[] | null | undefined, fallback: string |
 
 export const getAllProjectsData = createServerFn({ method: "GET" }).handler(async () => {
   const sb = await admin();
-  const { data } = await sb.from("projects").select("*, units(*)").order("created_at", { ascending: false });
+  const { data, error } = await sb.from("projects").select("*, units(*)").order("updated_at", { ascending: false });
+  if (error) console.error("getAllProjectsData error:", error);
   return (data ?? []).map((d: any) => ({
     ...d,
     unit_name: d.units?.name,
