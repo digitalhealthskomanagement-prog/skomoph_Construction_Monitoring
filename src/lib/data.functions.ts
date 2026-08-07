@@ -13,7 +13,7 @@ async function admin() {
 
 async function verifyProjectAccess(auth: any, sb: any, table: string | null, id: string | null, payloadProjectId: string | null = null, payloadPhaseId: string | null = null) {
   if (auth.role === "super_admin") return true;
-  if (auth.role !== "unit_admin" || !auth.projectId) return false;
+  if (auth.role !== "unit_admin" || !auth.unitIds || auth.unitIds.length === 0) return false;
   
   let targetProjectId = payloadProjectId;
   
@@ -23,7 +23,6 @@ async function verifyProjectAccess(auth: any, sb: any, table: string | null, id:
   }
 
   if (!targetProjectId && id && table) {
-    // Some tables use `id` as the project ID itself (e.g. projects)
     if (table === "projects") {
       targetProjectId = id;
     } else {
@@ -31,8 +30,12 @@ async function verifyProjectAccess(auth: any, sb: any, table: string | null, id:
       targetProjectId = data?.project_id;
     }
   }
-  
-  return auth.projectId === targetProjectId;
+
+  if (!targetProjectId) return false;
+
+  // Check if any of the user's units own this project
+  const { data: proj } = await sb.from("projects").select("unit_id").eq("id", targetProjectId).maybeSingle();
+  return proj && auth.unitIds.includes(proj.unit_id);
 }
 
 async function signImage(path: string | null): Promise<string | null> {

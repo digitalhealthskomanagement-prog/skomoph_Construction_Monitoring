@@ -233,68 +233,30 @@ function UnitDashboard({ unitId }: { unitId: string }) {
 /* ---------- Super Admin Dashboard ---------- */
 
 function SuperAdminDashboard() {
-  const { data: projects, isLoading } = useQuery(allProjectsQuery);
-  const save = useServerFn(saveSettings);
+  const { data: units, isLoading, refetch } = useQuery({
+    queryKey: ["units"],
+    queryFn: async () => {
+      const { getAllUnitsData } = await import("@/lib/data.functions");
+      return getAllUnitsData();
+    }
+  });
+
+  const saveUnitFn = useServerFn(saveUnit);
+  const deleteUnitFn = useServerFn(deleteUnit);
   const qc = useQueryClient();
   const [busy, setBusy] = useState<string | null>(null);
-
-  async function toggleActive(p: any) {
-    setBusy(p.id);
-    try {
-      const r = await save({
-        data: {
-          id: p.id,
-          title: p.title,
-          start_date: p.start_date,
-          end_date: p.end_date,
-          is_active: !p.is_active,
-        }
-      });
-      if (r.ok) {
-        toast.success(`เปลี่ยนสถานะ ${p.name} แล้ว`);
-        qc.invalidateQueries({ queryKey: ["all-projects"] });
-      } else {
-        toast.error("เกิดข้อผิดพลาด หรือไม่มีสิทธิ์");
-      }
-    } catch (e) {
-      toast.error("เกิดข้อผิดพลาด");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  const removeProject = useServerFn(deleteProject);
-  async function handleDelete(id: string, name: string) {
-    if (!window.confirm(`ยืนยันการลบหน่วยบริการ: ${name} ?`)) return;
-    setBusy(id);
-    try {
-      const r = await removeProject({ data: { id } });
-      if (r.ok) {
-        toast.success("ลบหน่วยบริการแล้ว");
-        qc.invalidateQueries({ queryKey: ["all-projects"] });
-      } else {
-        toast.error("ไม่มีสิทธิ์");
-      }
-    } catch {
-      toast.error("เกิดข้อผิดพลาดในการลบ");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  const addProject = useServerFn(createProject);
-  const [newProject, setNewProject] = useState({ title: "", unit_name: "", unit_type: "รพ.", district: "", province: "สระแก้ว" });
+  const [newUnit, setNewUnit] = useState({ name: "", type: "รพ.", district: "", province: "สระแก้ว" });
   const [isAdding, setIsAdding] = useState(false);
 
-  async function handleAddProject() {
-    if (!newProject.title.trim() || !newProject.unit_name.trim()) return toast.error("กรุณากรอกชื่อโครงการและหน่วยบริการ");
+  async function handleAddUnit() {
+    if (!newUnit.name.trim()) return toast.error("กรุณากรอกชื่อหน่วยบริการ");
     setIsAdding(true);
     try {
-      const r = await addProject({ data: newProject });
+      const r = await saveUnitFn({ data: newUnit });
       if (r.ok) {
         toast.success("เพิ่มหน่วยบริการใหม่แล้ว");
-        qc.invalidateQueries({ queryKey: ["all-projects"] });
-        setNewProject({ title: "", unit_name: "", unit_type: "รพ.", district: "", province: "สระแก้ว" });
+        setNewUnit({ name: "", type: "รพ.", district: "", province: "สระแก้ว" });
+        qc.invalidateQueries({ queryKey: ["units"] });
       } else {
         toast.error("ไม่มีสิทธิ์");
       }
@@ -302,6 +264,24 @@ function SuperAdminDashboard() {
       toast.error("เกิดข้อผิดพลาดในการเพิ่ม");
     } finally {
       setIsAdding(false);
+    }
+  }
+
+  async function handleDelete(id: string, name: string) {
+    if (!window.confirm(`ยืนยันการลบหน่วยบริการ: "${name}" ? โครงการทั้งหมดภายในหน่วยบริการนี้จะถูกลบไปด้วย!`)) return;
+    setBusy(id);
+    try {
+      const r = await deleteUnitFn({ data: { id } });
+      if (r.ok) {
+        toast.success("ลบหน่วยบริการแล้ว");
+        qc.invalidateQueries({ queryKey: ["units"] });
+      } else {
+        toast.error("ไม่มีสิทธิ์");
+      }
+    } catch {
+      toast.error("เกิดข้อผิดพลาดในการลบ");
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -315,7 +295,7 @@ function SuperAdminDashboard() {
             <h1 className="font-display text-3xl font-semibold tracking-tight">การจัดการระดับจังหวัด (สสจ.)</h1>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            เปิด-ปิด การแสดงผลของหน่วยบริการในระบบ
+            เพิ่ม / ลบ หน่วยบริการในระบบ
           </p>
         </div>
 
@@ -354,7 +334,7 @@ function SuperAdminDashboard() {
             <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
           ) : (
             <ul className="divide-y rounded-xl border">
-              {units?.map((u: any) => (
+              {(units as any[])?.map((u: any) => (
                 <li key={u.id} className="flex items-center justify-between gap-3 p-4 hover:bg-muted/30">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -368,16 +348,13 @@ function SuperAdminDashboard() {
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <Link to="/settings" onClick={() => window.location.href = `/settings?unitId=${u.id}`} className="text-brand hover:underline text-sm font-medium">
-                      ดูโครงการ &rarr;
-                    </Link>
                     <Button variant="ghost" size="icon" onClick={() => handleDelete(u.id, u.name)} aria-label="ลบหน่วยบริการ" disabled={busy === u.id}>
                       <Trash2 className="size-4 text-destructive" />
                     </Button>
                   </div>
                 </li>
               ))}
-              {(!units || units.length === 0) && (
+              {(!units || (units as any[]).length === 0) && (
                 <li className="p-4 text-sm text-center text-muted-foreground">ไม่พบหน่วยบริการ</li>
               )}
             </ul>
