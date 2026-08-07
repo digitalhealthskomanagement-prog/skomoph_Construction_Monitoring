@@ -12,6 +12,8 @@ import {
   deletePhase,
   saveResourceLink,
   deleteResourceLink,
+  createProject,
+  deleteProject,
 } from "@/lib/data.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -103,6 +105,48 @@ function SuperAdminDashboard() {
     }
   }
 
+  const removeProject = useServerFn(deleteProject);
+  async function handleDelete(id: string, name: string) {
+    if (!window.confirm(`ยืนยันการลบหน่วยบริการ: ${name} ?`)) return;
+    setBusy(id);
+    try {
+      const r = await removeProject({ data: { id } });
+      if (r.ok) {
+        toast.success("ลบหน่วยบริการแล้ว");
+        qc.invalidateQueries({ queryKey: ["all-projects"] });
+      } else {
+        toast.error("ไม่มีสิทธิ์");
+      }
+    } catch {
+      toast.error("เกิดข้อผิดพลาดในการลบ");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const addProject = useServerFn(createProject);
+  const [newProject, setNewProject] = useState({ title: "", unit_name: "", unit_type: "รพ.", district: "", province: "สระแก้ว" });
+  const [isAdding, setIsAdding] = useState(false);
+
+  async function handleAddProject() {
+    if (!newProject.title.trim() || !newProject.unit_name.trim()) return toast.error("กรุณากรอกชื่อโครงการและหน่วยบริการ");
+    setIsAdding(true);
+    try {
+      const r = await addProject({ data: newProject });
+      if (r.ok) {
+        toast.success("เพิ่มหน่วยบริการใหม่แล้ว");
+        qc.invalidateQueries({ queryKey: ["all-projects"] });
+        setNewProject({ title: "", unit_name: "", unit_type: "รพ.", district: "", province: "สระแก้ว" });
+      } else {
+        toast.error("ไม่มีสิทธิ์");
+      }
+    } catch {
+      toast.error("เกิดข้อผิดพลาดในการเพิ่ม");
+    } finally {
+      setIsAdding(false);
+    }
+  }
+
   return (
     <div className="min-h-screen">
       <SiteHeader />
@@ -118,6 +162,38 @@ function SuperAdminDashboard() {
         </div>
 
         <Card className="p-5">
+          <h2 className="font-display text-lg font-semibold mb-4">เพิ่มหน่วยบริการใหม่</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label="ชื่อโครงการเริ่มต้น">
+              <Input value={newProject.title} onChange={(e) => setNewProject({ ...newProject, title: e.target.value })} placeholder="เช่น โครงการก่อสร้าง..." />
+            </Field>
+            <Field label="ชื่อหน่วยบริการ">
+              <Input value={newProject.unit_name} onChange={(e) => setNewProject({ ...newProject, unit_name: e.target.value })} placeholder="เช่น รพ.เขาฉกรรจ์" />
+            </Field>
+            <Field label="ประเภทหน่วยบริการ">
+              <Select value={newProject.unit_type} onValueChange={(v) => setNewProject({ ...newProject, unit_type: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="รพ.">รพ.</SelectItem>
+                  <SelectItem value="รพ.สต.">รพ.สต.</SelectItem>
+                  <SelectItem value="สสจ.">สสจ.</SelectItem>
+                  <SelectItem value="สสอ.">สสอ.</SelectItem>
+                  <SelectItem value="อื่นๆ">อื่นๆ</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="อำเภอ">
+              <Input value={newProject.district} onChange={(e) => setNewProject({ ...newProject, district: e.target.value })} placeholder="เช่น เขาฉกรรจ์" />
+            </Field>
+            <div className="sm:col-span-2 lg:col-span-3">
+              <Button onClick={handleAddProject} disabled={isAdding} className="bg-brand text-brand-foreground hover:bg-brand/90">
+                <Plus className="mr-1.5 size-4" /> เพิ่มหน่วยบริการ
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-5">
           <h2 className="font-display text-lg font-semibold mb-4">รายชื่อหน่วยบริการทั้งหมด</h2>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
@@ -130,7 +206,7 @@ function SuperAdminDashboard() {
                       <Building2 className="size-5" />
                     </div>
                     <div className="min-w-0">
-                      <div className="truncate font-medium">{p.name}</div>
+                      <div className="truncate font-medium">{p.unit_name || p.title || p.name}</div>
                       <div className="text-xs text-muted-foreground">
                         {p.unit_type} · อ.{p.district}
                       </div>
@@ -151,6 +227,9 @@ function SuperAdminDashboard() {
                     <Link to="/projects/$projectId" params={{ projectId: p.id }} className="text-brand hover:underline text-sm font-medium">
                       ดูข้อมูล &rarr;
                     </Link>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id, p.unit_name || p.title || p.name)} aria-label="ลบโครงการ" disabled={busy === p.id}>
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
                   </div>
                 </li>
               ))}
