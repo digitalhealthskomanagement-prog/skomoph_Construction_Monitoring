@@ -383,6 +383,39 @@ export const saveSettings = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+export const createProject = createServerFn({ method: "POST" })
+  .inputValidator((d: { title: string; unit_name: string; unit_type: string; district: string; province: string; }) => d)
+  .handler(async ({ data }) => {
+    const auth = await getAuth();
+    if (auth.role !== "super_admin") return { ok: false as const, reason: "unauthorized" as const };
+    const sb = await admin();
+    const { error } = await sb.from("projects").insert({
+      title: data.title,
+      unit_name: data.unit_name,
+      unit_type: data.unit_type,
+      district: data.district,
+      province: data.province,
+      start_date: new Date().toISOString().split("T")[0],
+      end_date: new Date().toISOString().split("T")[0],
+      is_active: true,
+    });
+    if (error) throw error;
+    return { ok: true as const };
+  });
+
+export const deleteProject = createServerFn({ method: "POST" })
+  .inputValidator((d: { id: string; }) => d)
+  .handler(async ({ data }) => {
+    const auth = await getAuth();
+    if (auth.role !== "super_admin") return { ok: false as const, reason: "unauthorized" as const };
+    const sb = await admin();
+    // Delete user roles first to avoid foreign key constraints
+    await sb.from("user_roles").delete().eq("project_id", data.id);
+    const { error } = await sb.from("projects").delete().eq("id", data.id);
+    if (error) throw error;
+    return { ok: true as const };
+  });
+
 export const createHeroImageUpload = createServerFn({ method: "POST" })
   .inputValidator((d: { ext: string }) => d)
   .handler(async ({ data }) => {
