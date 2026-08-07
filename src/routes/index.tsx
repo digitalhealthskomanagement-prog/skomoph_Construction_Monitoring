@@ -5,6 +5,7 @@ import { Building2, MapPin, Search, Activity, Wallet, PieChart as PieChartIcon }
 import { ProjectMap } from "@/components/ProjectMap";
 import { SiteHeader } from "@/components/site-header";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import buildingHero from "@/assets/building-hero.png.asset.json";
 
 export const Route = createFileRoute("/")({
   loader: async ({ context }) => {
@@ -172,25 +173,14 @@ function DashboardComponent() {
                   className="group bg-white rounded-2xl border border-neutral-100 overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 flex flex-col h-full"
                 >
                   <div className="aspect-[4/3] bg-neutral-100 relative overflow-hidden">
-                    {project.hero_image_path ? (
-                      <img 
-                        src={`https://your-supabase-url/storage/v1/object/public/settings/${project.hero_image_path}`} 
-                        alt={project.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          e.currentTarget.parentElement?.classList.add('bg-neutral-200');
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-neutral-400 bg-neutral-50">
-                        <Building2 className="w-10 h-10 mb-2 opacity-50" />
-                        <span className="text-xs font-medium px-4 text-center">{project.unit_name}</span>
-                      </div>
-                    )}
+                    <img 
+                      src={project.hero_url || buildingHero.url} 
+                      alt={project.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
                     <div className="absolute top-3 left-3 flex gap-2">
                       <span className="px-2.5 py-1 bg-white/90 backdrop-blur-sm text-xs font-semibold text-primary rounded-full shadow-sm">
-                        {project.unit_type}
+                        {project.unit_type || "สสจ."}
                       </span>
                     </div>
                   </div>

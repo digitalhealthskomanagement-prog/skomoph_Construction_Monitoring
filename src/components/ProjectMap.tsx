@@ -72,14 +72,35 @@ export function ProjectMap({ projects }: { projects: any[] }) {
                 icon={customIcon}
               >
                 <Popup>
-                  <div className="text-center p-1">
-                    <div className="font-bold mb-1">{project.unit_name}</div>
-                    <div className="text-xs text-neutral-500 mb-2">{project.title}</div>
+                  <div className="p-1 min-w-[220px]">
+                    <div className="text-[10px] font-bold text-primary mb-0.5 uppercase tracking-wider">{project.unit_type || "สสจ."}</div>
+                    <div className="font-bold text-sm text-neutral-800 leading-tight mb-1">{project.unit_name}</div>
+                    <div className="text-xs text-neutral-500 line-clamp-2 mb-3">{project.title}</div>
+                    
+                    <div className="space-y-2 text-xs text-neutral-600 mb-3 border-t pt-2">
+                      <div className="flex justify-between items-center">
+                        <span>ความคืบหน้า:</span>
+                        <span className="font-bold text-primary">{project.total_progress}%</span>
+                      </div>
+                      <div className="h-2 w-full bg-neutral-100 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-primary rounded-full transition-all duration-500" 
+                          style={{ width: `${project.total_progress}%` }} 
+                        />
+                      </div>
+                      {project.budget_baht != null && (
+                        <div className="flex justify-between items-center pt-1">
+                          <span>งบประมาณ:</span>
+                          <span className="font-semibold text-neutral-800">{project.budget_baht.toLocaleString()} บ.</span>
+                        </div>
+                      )}
+                    </div>
+
                     <Link
                       to={`/projects/${project.id}`}
-                      className="text-primary text-xs font-medium hover:underline flex items-center justify-center gap-1"
+                      className="w-full text-center block text-xs font-semibold py-2 px-3 rounded-lg bg-primary text-primary-foreground hover:bg-primary/95 transition-colors no-underline!"
                     >
-                      ดูรายละเอียด <Navigation className="w-3 h-3" />
+                      ดูรายละเอียดโครงการ →
                     </Link>
                   </div>
                 </Popup>
