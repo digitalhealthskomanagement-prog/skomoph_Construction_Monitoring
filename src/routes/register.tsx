@@ -39,8 +39,8 @@ function Register() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("projects")
-        .select("id, name")
-        .order("name");
+        .select("id, unit_name, title")
+        .order("unit_name");
       if (error) throw error;
       return data;
     },
@@ -68,13 +68,15 @@ function Register() {
 
       if (authData.user) {
         // 2. Insert into user_roles
+        const rolePayload = {
+          user_id: authData.user.id,
+          project_id: projectId === "admin" ? null : projectId,
+          role: projectId === "admin" ? "super_admin" : "unit_admin",
+        };
+        
         const { error: roleError } = await supabase
           .from("user_roles")
-          .insert({
-            user_id: authData.user.id,
-            project_id: projectId,
-            role: "unit_admin",
-          });
+          .insert(rolePayload);
 
         if (roleError) {
           toast.error("เกิดข้อผิดพลาดในการตั้งค่าสิทธิ์หน่วยบริการ");
@@ -91,8 +93,8 @@ function Register() {
             ...old,
             unlocked: true,
             userId: authData.user?.id,
-            role: "unit_admin",
-            projectId: projectId,
+            role: projectId === "admin" ? "super_admin" : "unit_admin",
+            projectId: projectId === "admin" ? null : projectId,
           }));
         }
         
@@ -148,9 +150,10 @@ function Register() {
                 <SelectValue placeholder={projectsLoading ? "กำลังโหลด..." : "เลือกหน่วยบริการ..."} />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="admin">สำนักงานสาธารณสุขจังหวัดสระแก้ว (สสจ.)</SelectItem>
                 {projects?.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
-                    {p.name}
+                    {p.unit_name || p.title}
                   </SelectItem>
                 ))}
               </SelectContent>
