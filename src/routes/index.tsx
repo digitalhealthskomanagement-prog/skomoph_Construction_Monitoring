@@ -3,6 +3,7 @@ import { allProjectsQuery } from "@/lib/project-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Building2, MapPin, Search } from "lucide-react";
 import { ProjectMap } from "@/components/ProjectMap";
+import { SiteHeader } from "@/components/site-header";
 
 export const Route = createFileRoute("/")({
   loader: async ({ context }) => {
@@ -18,21 +19,7 @@ function DashboardComponent() {
 
   return (
     <div className="min-h-screen bg-neutral-50 pb-20">
-      <header className="bg-white border-b shadow-sm sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
-              <Building2 className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="font-bold text-lg leading-tight text-neutral-900">
-                ระบบติดตามงานก่อสร้าง
-              </h1>
-              <p className="text-xs text-neutral-500">สำนักงานสาธารณสุขจังหวัดสระแก้ว</p>
-            </div>
-          </div>
-        </div>
-      </header>
+      <SiteHeader />
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
         
