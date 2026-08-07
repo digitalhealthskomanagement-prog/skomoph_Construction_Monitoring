@@ -598,6 +598,7 @@ function ProjectForm({ settings, projectId }: { settings: ProjectSettings | null
     cons_subtitle: settings?.cons_subtitle ?? "",
   });
   const [heroPath, setHeroPath] = useState<string | null>(settings?.hero_image_path ?? null);
+  const [isActive, setIsActive] = useState<boolean>(settings?.is_active ?? true);
   const [busy, setBusy] = useState(false);
 
   function set(k: keyof typeof f, v: string) {
@@ -645,6 +646,7 @@ function ProjectForm({ settings, projectId }: { settings: ProjectSettings | null
           cons_heading: f.cons_heading || null,
           cons_subtitle: f.cons_subtitle || null,
           hero_image_path: heroPath,
+          is_active: isActive,
         },
       });
       if (!r.ok) return toast.error("ไม่มีสิทธิ์บันทึกข้อมูล");
@@ -723,6 +725,15 @@ function ProjectForm({ settings, projectId }: { settings: ProjectSettings | null
                 (แนะนำ) หากไม่ได้อัปโหลดรูป ระบบจะนำภาพล่าสุดจากรายงานความคืบหน้ามาแสดงเป็นหน้าปกโดยอัตโนมัติ
               </p>
             </div>
+          </div>
+        <Field label="สถานะโครงการ" className="sm:col-span-2">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="is_active"
+              checked={isActive}
+              onCheckedChange={setIsActive}
+            />
+            <Label htmlFor="is_active">เปิดใช้งาน (แสดงโครงการนี้บนหน้าแรกและแผนที่สาธารณะ)</Label>
           </div>
         </Field>
       </div>
