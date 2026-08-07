@@ -28,9 +28,9 @@ export const Route = createFileRoute("/projects/$projectId")({
   },
   head: () => ({
     meta: [
-      { title: "โครงการก่อสร้างอาคารผู้ป่วย 5 ชั้น — โรงพยาบาลสรรคบุรี" },
-      { name: "description", content: "ติดตามความคืบหน้าและปฏิทินงานก่อสร้างอาคารผู้ป่วยนอก–ผู้ป่วยหนัก–ผ่าตัด–ผู้ป่วยใน 5 ชั้น รพ.สรรคบุรี ปีงบประมาณ 2570–2572" },
-      { property: "og:title", content: "โครงการก่อสร้างอาคารผู้ป่วย 5 ชั้น — รพ.สรรคบุรี" },
+      { title: "รายละเอียดโครงการก่อสร้าง" },
+      { name: "description", content: "ติดตามความคืบหน้าและปฏิทินงานก่อสร้าง" },
+      { property: "og:title", content: "รายละเอียดโครงการก่อสร้าง" },
       { property: "og:description", content: "ติดตามความคืบหน้าและปฏิทินการก่อสร้างแบบ Real-time" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

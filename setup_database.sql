@@ -1,4 +1,202 @@
--- Rename project_settings to projects
+
+-- Project settings (singleton row)
+CREATE TABLE public.project_settings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  subtitle text,
+  start_date date NOT NULL,
+  end_date date NOT NULL,
+  total_progress numeric NOT NULL DEFAULT 0,
+  budget_baht bigint,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT ON public.project_settings TO anon, authenticated;
+GRANT ALL ON public.project_settings TO service_role;
+ALTER TABLE public.project_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public read settings" ON public.project_settings FOR SELECT USING (true);
+
+-- Phases
+CREATE TABLE public.phases (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  "order" int NOT NULL DEFAULT 0,
+  progress numeric NOT NULL DEFAULT 0,
+  color text NOT NULL DEFAULT '#0ea5e9',
+  start_date date,
+  end_date date,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT ON public.phases TO anon, authenticated;
+GRANT ALL ON public.phases TO service_role;
+ALTER TABLE public.phases ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public read phases" ON public.phases FOR SELECT USING (true);
+
+-- Calendar events
+CREATE TABLE public.calendar_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  start_date date NOT NULL,
+  end_date date NOT NULL,
+  type text NOT NULL DEFAULT 'task',
+  phase_id uuid REFERENCES public.phases(id) ON DELETE SET NULL,
+  note text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT ON public.calendar_events TO anon, authenticated;
+GRANT ALL ON public.calendar_events TO service_role;
+ALTER TABLE public.calendar_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public read events" ON public.calendar_events FOR SELECT USING (true);
+
+-- Updates feed
+CREATE TABLE public.updates (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  body text NOT NULL,
+  reporter_name text,
+  phase_id uuid REFERENCES public.phases(id) ON DELETE SET NULL,
+  progress_snapshot numeric,
+  image_url text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT ON public.updates TO anon, authenticated;
+GRANT ALL ON public.updates TO service_role;
+ALTER TABLE public.updates ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public read updates" ON public.updates FOR SELECT USING (true);
+
+-- Seed project + phases
+INSERT INTO public.project_settings (title, subtitle, start_date, end_date, total_progress)
+VALUES (
+  'อาคารผู้ป่วยนอก–ผู้ป่วยหนัก–ผ่าตัด–ผู้ป่วยใน 5 ชั้น',
+  'โรงพยาบาลสรรคบุรี ปีงบประมาณ 2570–2572',
+  '2026-10-01',
+  '2029-09-30',
+  0
+);
+
+INSERT INTO public.phases (name, "order", progress, color, start_date, end_date) VALUES
+  ('ออกแบบและเตรียมการ', 1, 0, '#0ea5e9', '2026-10-01', '2027-01-31'),
+  ('จัดซื้อจัดจ้าง', 2, 0, '#6366f1', '2027-02-01', '2027-04-30'),
+  ('งานฐานราก', 3, 0, '#8b5cf6', '2027-05-01', '2027-09-30'),
+  ('งานโครงสร้าง', 4, 0, '#ec4899', '2027-10-01', '2028-06-30'),
+  ('งานสถาปัตย์', 5, 0, '#f97316', '2028-04-01', '2028-12-31'),
+  ('งานระบบ (ไฟฟ้า/สุขาภิบาล/ปรับอากาศ)', 6, 0, '#eab308', '2028-07-01', '2029-03-31'),
+  ('งานตกแต่งภายในและครุภัณฑ์', 7, 0, '#22c55e', '2029-01-01', '2029-07-31'),
+  ('ตรวจรับและส่งมอบ', 8, 0, '#14b8a6', '2029-08-01', '2029-09-30');
+
+CREATE POLICY "public read updates images" ON storage.objects
+  FOR SELECT USING (bucket_id = 'updates');
+
+ALTER TABLE public.phases
+  ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT 'construction',
+  ADD COLUMN IF NOT EXISTS weight numeric,
+  ADD COLUMN IF NOT EXISTS code text,
+  ADD COLUMN IF NOT EXISTS duration_label text;
+
+DELETE FROM public.phases;
+
+-- Preparation phases (1.1 - 1.15)
+INSERT INTO public.phases (category, code, name, "order", color, duration_label, start_date, end_date) VALUES
+('preparation','1.1','เสนอแต่งตั้งคณะกรรมการกำหนดขอบเขตงาน (TOR) และราคากลาง',101,'#0ea5e9','5 วัน','2026-09-01','2026-09-05'),
+('preparation','1.2','คณะกรรมการฯ จัดทำแบบรูปรายการและราคากลาง',102,'#0ea5e9','20 วัน','2026-09-06','2026-09-25'),
+('preparation','1.3','เสนอรายงานผลราคากลาง และขอความเห็นชอบ',103,'#0ea5e9','1 วัน','2026-09-26','2026-09-26'),
+('preparation','1.4','จัดทำรายงานขอซื้อขอจ้าง พร้อมแต่งตั้งคณะกรรมการพิจารณาผลฯ',104,'#0ea5e9','6 วัน','2026-09-27','2026-10-02'),
+('preparation','1.5','เผยแพร่ร่างประกาศเพื่อรับฟังคำวิจารณ์ (7 วันทำการ)',105,'#0ea5e9','11 วัน','2026-10-03','2026-10-13'),
+('preparation','1.6','รายงานผลรับฟังความคิดเห็น และผู้บริหารลงนามประกาศเชิญชวน',106,'#0ea5e9','1 วัน','2026-10-14','2026-10-14'),
+('preparation','1.7','เผยแพร่ประกาศประกวดราคา e-bidding (20 วันทำการ)',107,'#0ea5e9','28 วัน','2026-10-15','2026-11-11'),
+('preparation','1.8','ผู้เสนอราคายื่นข้อเสนอทางระบบอิเล็กทรอนิกส์',108,'#0ea5e9','1 วัน','2026-11-12','2026-11-12'),
+('preparation','1.9','คณะกรรมการพิจารณาผลการประกวดราคาฯ',109,'#0ea5e9','5 วัน','2026-11-13','2026-11-17'),
+('preparation','1.10','รายงานผลการพิจารณาให้ผู้มีอำนาจลงนาม',110,'#0ea5e9','1 วัน','2026-11-18','2026-11-18'),
+('preparation','1.11','ประกาศผู้ชนะการเสนอราคา',111,'#0ea5e9','1 วัน','2026-11-19','2026-11-19'),
+('preparation','1.12','เว้นระยะเวลาอุทธรณ์ (7 วันทำการ)',112,'#0ea5e9','11 วัน','2026-11-20','2026-11-30'),
+('preparation','1.13','รายงานผลอุทธรณ์ / เสนอผู้บริหารเรียกทำสัญญา',113,'#0ea5e9','1 วัน','2026-12-01','2026-12-01'),
+('preparation','1.14','ผู้รับจ้างเตรียมหลักประกัน และตรวจสอบเอกสารเพื่อลงนาม',114,'#0ea5e9','17 วัน','2026-12-02','2026-12-18'),
+('preparation','1.15','ผู้มีอำนาจลงนามสัญญาจ้างก่อสร้าง (เริ่มต้นนับเวลาก่อสร้าง)',115,'#0ea5e9','1 วัน','2026-12-19','2026-12-19');
+
+-- Construction milestones (งวดที่ 1 - 16)
+INSERT INTO public.phases (category, code, name, "order", color, duration_label, weight, start_date, end_date) VALUES
+('construction','งวดที่ 1','รื้อถอน, ปรับพื้นที่, ปักผัง, เจาะสำรวจดิน, ก่อสร้างเสาเข็มและทดสอบ',201,'#f59e0b','ภายใน 90 วัน',4.00,'2026-12-19','2027-03-19'),
+('construction','งวดที่ 2','ก่อสร้างฐานราก, ตอม่อ, ถังเก็บน้ำใต้ดิน, ช่องลิฟต์/ผนัง ค.ส.ล. ชั้น 1, เดินท่อระบบ',202,'#f59e0b','ภายใน 150 วัน',3.50,'2027-03-20','2027-05-18'),
+('construction','งวดที่ 3','โครงสร้างพื้น-คาน ชั้น 1, บันได, เสารับชั้น 2, ช่องลิฟต์ชั้น 2, ฝังท่อในคอนกรีต',203,'#f59e0b','ภายใน 180 วัน',3.00,'2027-05-19','2027-06-17'),
+('construction','งวดที่ 4','โครงสร้างพื้น-คาน ชั้น 2, บันได, เสารับชั้น 3, ช่องลิฟต์ชั้น 3, ฝังท่อในคอนกรีต',204,'#f59e0b','ภายใน 210 วัน',2.50,'2027-06-18','2027-07-17'),
+('construction','งวดที่ 5','โครงสร้างพื้น-คาน ชั้น 3, เสารับชั้น 4, ก่ออิฐชั้น 1, เดินท่อระบบสุขาภิบาล/ไฟฟ้าชั้น 1',205,'#f59e0b','ภายใน 240 วัน',3.00,'2027-07-18','2027-08-16'),
+('construction','งวดที่ 6','โครงสร้างพื้น-คาน ชั้น 4, เสารับชั้น 5, ก่ออิฐชั้น 2, เดินท่อระบบชั้น 1-2',206,'#f59e0b','ภายใน 270 วัน',4.00,'2027-08-17','2027-09-15'),
+('construction','งวดที่ 7','โครงสร้างพื้น-คาน ชั้น 5, เสารับชั้นดาดฟ้า, ก่ออิฐชั้น 3, ฉาบปูนชั้น 1, เดินท่อระบบชั้น 2-3',207,'#f59e0b','ภายใน 315 วัน',4.25,'2027-09-16','2027-10-30'),
+('construction','งวดที่ 8','โครงสร้างพื้นดาดฟ้า, หลังคา, ก่ออิฐชั้น 4, ฉาบปูนชั้น 2, ปูกระเบื้อง/หินขัดชั้น 1',208,'#f59e0b','ภายใน 360 วัน',5.25,'2027-10-31','2027-12-14'),
+('construction','งวดที่ 9','ก่ออิฐส่วนที่เหลือ, ฉาบปูนชั้น 3, ปูกระเบื้อง/หินขัดชั้น 2, เดินท่อ/สายไฟชั้น 3-5',209,'#f59e0b','ภายใน 405 วัน',3.00,'2027-12-15','2028-01-28'),
+('construction','งวดที่ 10','ฉาบปูนชั้น 4, ปูกระเบื้อง/หินขัดชั้น 3, ติดตั้งถังน้ำสแตนเลส, เดินท่อเมนแนวดิ่งทั้งหมด',210,'#f59e0b','ภายใน 450 วัน',2.50,'2028-01-29','2028-03-14'),
+('construction','งวดที่ 11','ติดตั้งฝ้าเพดานชั้น 1-2, ฉาบปูนภายนอก/ภายในที่เหลือ, งานพื้นชั้น 4, บ่อพักน้ำ/ท่อระบาย',211,'#f59e0b','ภายใน 500 วัน',6.50,'2028-03-15','2028-05-03'),
+('construction','งวดที่ 12','ติดตั้งฝ้าชั้น 3-4, ปูกระเบื้องที่เหลือ, ติดตั้งผนังห้องผ่าตัด, ประตู-หน้าต่างชั้น 1-2',212,'#f59e0b','ภายใน 545 วัน',10.00,'2028-05-04','2028-06-17'),
+('construction','งวดที่ 13','ฝ้าเพดานที่เหลือ, ผิวพื้นภายนอก, ประตู-หน้าต่างชั้น 3-4, สุขภัณฑ์, แอร์ชั้น 4-5, ทาสีรองพื้น',213,'#f59e0b','ภายใน 590 วัน',9.50,'2028-06-18','2028-08-01'),
+('construction','งวดที่ 14','ตกแต่งแผ่นคอมโพสิท, กันซึมหลังคา, ติดตั้งเครื่องกำเนิดไฟฟ้า, ระบบกันฟ้าผ่า, ทาสีจริงชั้น 1-2',214,'#f59e0b','ภายใน 640 วัน',14.00,'2028-08-02','2028-09-20'),
+('construction','งวดที่ 15','กระเบื้องยาง, หม้อแปลงไฟฟ้า, ลิฟต์, ระบบสื่อสาร (โทรศัพท์, CCTV, เรียกพยาบาล)',215,'#f59e0b','ภายใน 685 วัน',10.00,'2028-09-21','2028-11-04'),
+('construction','งวดที่ 16','ทาสีที่เหลือ, ติดตั้งอุปกรณ์จ่ายแก๊ส, ทดสอบระบบ, ส่งคู่มือ/As-Built (BIM), ทำความสะอาด',216,'#f59e0b','ภายใน 730 วัน',15.00,'2028-11-05','2028-12-19');
+CREATE TABLE public.risks (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  phase_id uuid REFERENCES public.phases(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  description text,
+  severity text NOT NULL DEFAULT 'medium' CHECK (severity IN ('low','medium','high')),
+  mitigation text,
+  status text NOT NULL DEFAULT 'open' CHECK (status IN ('open','monitoring','closed')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+GRANT SELECT ON public.risks TO anon, authenticated;
+GRANT ALL ON public.risks TO service_role;
+
+ALTER TABLE public.risks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "public read risks" ON public.risks FOR SELECT USING (true);
+
+CREATE INDEX risks_phase_id_idx ON public.risks(phase_id);ALTER TABLE public.updates ADD COLUMN IF NOT EXISTS image_urls text[] NOT NULL DEFAULT '{}'::text[];
+UPDATE public.updates SET image_urls = ARRAY[image_url] WHERE image_url IS NOT NULL AND cardinality(image_urls) = 0;ALTER TABLE public.updates ADD COLUMN IF NOT EXISTS thumb_urls text[] NOT NULL DEFAULT '{}';ALTER TABLE public.project_settings
+  ADD COLUMN IF NOT EXISTS hero_image_path text,
+  ADD COLUMN IF NOT EXISTS org_name text,
+  ADD COLUMN IF NOT EXISTS org_tagline text,
+  ADD COLUMN IF NOT EXISTS intro_text text,
+  ADD COLUMN IF NOT EXISTS prep_heading text,
+  ADD COLUMN IF NOT EXISTS prep_subtitle text,
+  ADD COLUMN IF NOT EXISTS cons_heading text,
+  ADD COLUMN IF NOT EXISTS cons_subtitle text,
+  ADD COLUMN IF NOT EXISTS calendar_start_month date;
+
+CREATE TABLE IF NOT EXISTS public.resource_links (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  label text NOT NULL,
+  description text,
+  url text NOT NULL,
+  icon text NOT NULL DEFAULT 'link',
+  "order" integer NOT NULL DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+GRANT SELECT ON public.resource_links TO anon;
+GRANT SELECT ON public.resource_links TO authenticated;
+GRANT ALL ON public.resource_links TO service_role;
+
+ALTER TABLE public.resource_links ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "public read resource links" ON public.resource_links;
+CREATE POLICY "public read resource links" ON public.resource_links FOR SELECT USING (true);
+
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = now(); RETURN NEW; END; $$
+LANGUAGE plpgsql SET search_path = public;
+
+DROP TRIGGER IF EXISTS update_resource_links_updated_at ON public.resource_links;
+CREATE TRIGGER update_resource_links_updated_at
+BEFORE UPDATE ON public.resource_links
+FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+INSERT INTO public.resource_links (label, description, url, icon, "order")
+SELECT 'Google Drive', 'โฟลเดอร์เอกสาร แบบแปลน และไฟล์โครงการ', 'https://drive.google.com/drive/folders/16t4li6L8jyQRwWDsUhszad9kvE2eOL6W?usp=drive_link', 'folder', 0
+WHERE NOT EXISTS (SELECT 1 FROM public.resource_links);
+
+INSERT INTO public.resource_links (label, description, url, icon, "order")
+SELECT 'NotebookLM', 'สรุปและถาม-ตอบเอกสารโครงการด้วย AI', 'https://notebooklm.google.com/notebook/a0889a1d-e641-4b16-946c-73957e4d44af', 'notebook', 1
+WHERE NOT EXISTS (SELECT 1 FROM public.resource_links WHERE icon = 'notebook');-- Rename project_settings to projects
 ALTER TABLE public.project_settings RENAME TO projects;
 
 -- Add service unit specific columns

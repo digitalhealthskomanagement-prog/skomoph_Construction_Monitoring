@@ -14,9 +14,9 @@ export const Route = createFileRoute("/updates")({
   loader: ({ context }) => context.queryClient.ensureQueryData(projectQuery),
   head: () => ({
     meta: [
-      { title: "รายงานความคืบหน้า — โครงการก่อสร้าง รพ.สรรคบุรี" },
-      { name: "description", content: "รายงานความคืบหน้า ปัญหา และเหตุการณ์สำคัญของโครงการก่อสร้างอาคารผู้ป่วย 5 ชั้น จากทีมงาน" },
-      { property: "og:title", content: "รายงานความคืบหน้าโครงการก่อสร้าง — รพ.สรรคบุรี" },
+      { title: "รายงานความคืบหน้า — ระบบติดตามงานก่อสร้าง" },
+      { name: "description", content: "รายงานความคืบหน้างานก่อสร้างประจำสัปดาห์/เดือน พร้อมรูปภาพหน้างาน" },
+      { property: "og:title", content: "รายงานความคืบหน้าโครงการก่อสร้าง" },
       { property: "og:description", content: "รายงานจากทีมงานภาคสนามและผู้บริหารโครงการ" },
       { property: "og:type", content: "website" },
     ],

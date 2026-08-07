@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as RegisterRouteImport } from './routes/register'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as UpdatesRouteImport } from './routes/updates'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
@@ -23,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -44,6 +50,7 @@ const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
   '/updates': typeof UpdatesRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
   '/updates': typeof UpdatesRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
@@ -59,19 +67,33 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
   '/updates': typeof UpdatesRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/settings' | '/updates' | '/projects/$projectId'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/register'
+    | '/settings'
+    | '/updates'
+    | '/projects/$projectId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/settings' | '/updates' | '/projects/$projectId'
+  to:
+    | '/'
+    | '/login'
+    | '/register'
+    | '/settings'
+    | '/updates'
+    | '/projects/$projectId'
   id:
     | '__root__'
     | '/'
     | '/login'
+    | '/register'
     | '/settings'
     | '/updates'
     | '/projects/$projectId'
@@ -80,6 +102,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
+  RegisterRoute: typeof RegisterRoute
   SettingsRoute: typeof SettingsRoute
   UpdatesRoute: typeof UpdatesRoute
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
@@ -99,6 +122,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -128,6 +158,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
+  RegisterRoute: RegisterRoute,
   SettingsRoute: SettingsRoute,
   UpdatesRoute: UpdatesRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRoute,

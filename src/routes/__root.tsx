@@ -78,8 +78,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "รพ.สรรคบุรี — โครงการก่อสร้างอาคารผู้ป่วย 5 ชั้น" },
-      { name: "description", content: "เว็บไซต์เผยแพร่และติดตามความคืบหน้าโครงการก่อสร้างของโรงพยาบาลสรรคบุรี" },
+      { title: "ระบบติดตามงานก่อสร้าง — สำนักงานสาธารณสุขจังหวัดสระแก้ว" },
+      { name: "description", content: "เว็บไซต์สำหรับติดตามความคืบหน้าโครงการก่อสร้างของสำนักงานสาธารณสุขจังหวัดสระแก้ว" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

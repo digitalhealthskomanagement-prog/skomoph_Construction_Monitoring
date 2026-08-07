@@ -1,36 +1,35 @@
 import { Link, useRouter } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectQuery, type ProjectSettings } from "@/lib/project-query";
 import { KeyRound, LogOut, Settings2 } from "lucide-react";
 import hospitalLogo from "@/assets/hospital-logo.png";
 import { Button } from "@/components/ui/button";
 import { AUTH_STATUS_QUERY_KEY, type AuthStatus, useAuthStatus } from "@/hooks/use-auth-status";
-import { lockSite } from "@/lib/gate.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export function SiteHeader() {
   const { data } = useAuthStatus();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const doLock = useServerFn(lockSite);
   const { data: project } = useQuery(projectQuery);
   const settings = (project?.settings ?? null) as ProjectSettings | null;
   const unlocked = data?.unlocked;
 
   async function onLock() {
-    await doLock();
-    queryClient.setQueryData<AuthStatus>(AUTH_STATUS_QUERY_KEY, { unlocked: false });
-    await queryClient.invalidateQueries({ queryKey: AUTH_STATUS_QUERY_KEY });
+    await supabase.auth.signOut();
+    queryClient.setQueryData<AuthStatus>(AUTH_STATUS_QUERY_KEY, { unlocked: false, user: null, role: null, projectId: null });
     toast.success("ออกจากระบบเรียบร้อย");
+    await queryClient.invalidateQueries({ queryKey: AUTH_STATUS_QUERY_KEY });
     await router.invalidate();
+    router.navigate({ to: "/" });
   }
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-lg">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         <Link to="/" className="flex items-center gap-3">
-          <img src={hospitalLogo} alt="โลโก้ รพ.สรรคบุรี" width={48} height={48} className="size-12 rounded-xl bg-white object-contain p-1 shadow-sm ring-1 ring-border" />
+          <img src={hospitalLogo} alt="โลโก้หน่วยงาน" width={48} height={48} className="size-12 rounded-xl bg-white object-contain p-1 shadow-sm ring-1 ring-border" />
           <div className="leading-tight">
             <div className="font-display text-base font-semibold tracking-tight">{settings?.org_name ?? "ชื่อหน่วยงาน"}</div>
             <div className="text-xs text-muted-foreground">{settings?.org_tagline ?? settings?.title ?? "โครงการก่อสร้าง"}</div>

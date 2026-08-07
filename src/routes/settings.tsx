@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { useAuthStatus } from "@/hooks/use-auth-status";
-import { projectQuery, type ProjectSettings, type ResourceLink } from "@/lib/project-query";
+import { projectQuery, allProjectsQuery, type ProjectSettings, type ResourceLink } from "@/lib/project-query";
 import {
   saveSettings,
   createHeroImageUpload,
@@ -21,39 +21,28 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RESOURCE_ICON_OPTIONS } from "@/components/team-resources";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
-import { ImagePlus, Plus, Save, Trash2 } from "lucide-react";
+import { ImagePlus, Plus, Save, Trash2, ShieldCheck, Building2, Eye, EyeOff } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(projectQuery),
   head: () => ({
     meta: [
-      { title: "ตั้งค่าโครงการ — ระบบติดตามงานก่อสร้าง" },
-      { name: "description", content: "ตั้งค่าชื่อโครงการ หน่วยงาน รูปนำ ช่วงเวลา เฟสงาน และลิงก์ทรัพยากรของระบบติดตามความคืบหน้างานก่อสร้าง" },
-      { property: "og:title", content: "ตั้งค่าโครงการ — ระบบติดตามงานก่อสร้าง" },
-      { property: "og:description", content: "จัดการข้อมูลโครงการ เฟสงาน และทรัพยากรทีมงาน" },
-      { property: "og:type", content: "website" },
+      { title: "ตั้งค่าระบบ — ระบบติดตามงานก่อสร้าง" },
+      { name: "description", content: "จัดการหน่วยบริการและตั้งค่าโครงการ" },
       { name: "robots", content: "noindex" },
     ],
   }),
-  component: SettingsPage,
+  component: SettingsRouter,
 });
 
-type Phase = {
-  id: string;
-  name: string;
-  category?: string | null;
-  code?: string | null;
-  weight?: number | null;
-  duration_label?: string | null;
-  progress: number;
-  order?: number;
-};
+function SettingsRouter() {
+  const { data: auth, isLoading: authLoading } = useAuthStatus();
 
-function SettingsPage() {
-  const { data } = useSuspenseQuery(projectQuery);
-  const { data: auth } = useAuthStatus();
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center">กำลังโหลด...</div>;
+  }
 
   if (!auth?.unlocked) {
     return (
@@ -70,27 +59,241 @@ function SettingsPage() {
     );
   }
 
+  if (auth.role === "super_admin") {
+    return <SuperAdminDashboard />;
+  }
+
+  if (auth.role === "unit_admin" && auth.projectId) {
+    return <UnitSettingsPage projectId={auth.projectId} />;
+  }
+
+  return <div className="p-8 text-center">คุณไม่มีสิทธิ์เข้าถึงหน้านี้ หรือไม่ได้ผูกกับหน่วยบริการใด</div>;
+}
+
+/* ---------- Super Admin Dashboard ---------- */
+
+function SuperAdminDashboard() {
+  const { data: projects, isLoading } = useQuery(allProjectsQuery);
+  const save = useServerFn(saveSettings);
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function toggleActive(p: any) {
+    setBusy(p.id);
+    try {
+      const r = await save({
+        data: {
+          id: p.id,
+          title: p.title,
+          start_date: p.start_date,
+          end_date: p.end_date,
+          is_active: !p.is_active,
+        }
+      });
+      if (r.ok) {
+        toast.success(`เปลี่ยนสถานะ ${p.name} แล้ว`);
+        qc.invalidateQueries({ queryKey: ["all-projects"] });
+      } else {
+        toast.error("เกิดข้อผิดพลาด หรือไม่มีสิทธิ์");
+      }
+    } catch (e) {
+      toast.error("เกิดข้อผิดพลาด");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="min-h-screen">
       <SiteHeader />
       <main className="mx-auto max-w-4xl space-y-8 px-4 py-10 sm:px-6">
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">ตั้งค่าโครงการ</h1>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="size-6 text-brand" />
+            <h1 className="font-display text-3xl font-semibold tracking-tight">การจัดการระดับจังหวัด (สสจ.)</h1>
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            กรอกข้อมูลโครงการ รูปนำ เฟสงาน และลิงก์ทรัพยากร — ใช้ซ้ำได้กับทุกโครงการก่อสร้าง
+            เปิด-ปิด การแสดงผลของหน่วยบริการในระบบ
           </p>
         </div>
-        <ProjectForm settings={(data.settings ?? null) as ProjectSettings | null} />
-        <PhasesEditor phases={(data.phases ?? []) as Phase[]} />
-        <ResourcesEditor links={(data.resources ?? []) as ResourceLink[]} />
+
+        <Card className="p-5">
+          <h2 className="font-display text-lg font-semibold mb-4">รายชื่อหน่วยบริการทั้งหมด</h2>
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
+          ) : (
+            <ul className="divide-y rounded-xl border">
+              {projects?.map((p) => (
+                <li key={p.id} className="flex items-center justify-between gap-3 p-4 hover:bg-muted/30">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Building2 className="size-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{p.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {p.unit_type} · อ.{p.district}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor={`active-${p.id}`} className="text-xs text-muted-foreground hidden sm:inline-block">
+                        {p.is_active ? "เปิดใช้งาน" : "ซ่อน"}
+                      </Label>
+                      <Switch 
+                        id={`active-${p.id}`}
+                        checked={p.is_active} 
+                        disabled={busy === p.id}
+                        onCheckedChange={() => toggleActive(p)} 
+                      />
+                    </div>
+                    <Link to="/projects/$projectId" params={{ projectId: p.id }} className="text-brand hover:underline text-sm font-medium">
+                      ดูข้อมูล &rarr;
+                    </Link>
+                  </div>
+                </li>
+              ))}
+              {(!projects || projects.length === 0) && (
+                <li className="p-4 text-sm text-center text-muted-foreground">ไม่พบหน่วยบริการ</li>
+              )}
+            </ul>
+          )}
+        </Card>
+
+        <GlobalResourcesEditor />
       </main>
     </div>
   );
 }
 
-/* ---------- Project info ---------- */
+function GlobalResourcesEditor() {
+  const { data: projects } = useQuery(allProjectsQuery);
+  // Resource links don't have project_id in schema currently, they are global.
+  // We can fetch them by getting project data for any project, or just a custom query.
+  // Wait, let's just use the first project to load resources if needed, or create a specific query.
+  // For simplicity, skip editing global resources here, or do a direct supabase query.
+  const { data: links, refetch } = useQuery({
+    queryKey: ["global-resources"],
+    queryFn: async () => {
+      const { data } = await supabase.from("resource_links").select("*").order("order");
+      return data || [];
+    }
+  });
 
-function ProjectForm({ settings }: { settings: ProjectSettings | null }) {
+  const save = useServerFn(saveResourceLink);
+  const remove = useServerFn(deleteResourceLink);
+  const [draft, setDraft] = useState({ label: "", description: "", url: "", icon: "link" });
+  const [busy, setBusy] = useState(false);
+
+  async function add() {
+    if (!draft.label.trim() || !draft.url.trim()) return toast.error("กรุณากรอกชื่อและลิงก์");
+    setBusy(true);
+    try {
+      const r = await save({
+        data: {
+          label: draft.label.trim(),
+          description: draft.description || null,
+          url: draft.url.trim(),
+          icon: draft.icon,
+          order: links?.length || 0,
+        },
+      });
+      if (!r.ok) return toast.error("ไม่มีสิทธิ์");
+      toast.success("เพิ่มลิงก์แล้ว");
+      setDraft({ label: "", description: "", url: "", icon: "link" });
+      refetch();
+    } catch {
+      toast.error("เกิดข้อผิดพลาด");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function del(id: string) {
+    const r = await remove({ data: { id } });
+    if (!r.ok) return toast.error("ไม่มีสิทธิ์");
+    toast.success("ลบลิงก์แล้ว");
+    refetch();
+  }
+
+  return (
+    <Card className="space-y-4 p-5">
+      <h2 className="font-display text-lg font-semibold">ลิงก์ส่วนกลาง (แสดงทุก รพ.)</h2>
+      <div className="grid gap-3 rounded-xl border p-4 sm:grid-cols-2">
+        <Field label="ชื่อลิงก์">
+          <Input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} placeholder="เช่น คู่มือการใช้งาน" />
+        </Field>
+        <Field label="ไอคอน">
+          <Select value={draft.icon} onValueChange={(v) => setDraft({ ...draft, icon: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {RESOURCE_ICON_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="URL" className="sm:col-span-2">
+          <Input value={draft.url} onChange={(e) => setDraft({ ...draft, url: e.target.value })} placeholder="https://..." />
+        </Field>
+        <Field label="คำอธิบาย" className="sm:col-span-2">
+          <Input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+        </Field>
+        <div className="sm:col-span-2">
+          <Button onClick={add} disabled={busy} variant="secondary">
+            <Plus className="mr-1.5 size-4" /> เพิ่มลิงก์ส่วนกลาง
+          </Button>
+        </div>
+      </div>
+
+      <ul className="divide-y rounded-xl border">
+        {links?.map((r) => (
+          <li key={r.id} className="flex items-center justify-between gap-3 p-3">
+            <div className="min-w-0">
+              <div className="truncate text-sm font-medium">{r.label}</div>
+              <div className="truncate text-xs text-muted-foreground">{r.url}</div>
+            </div>
+            <Button variant="ghost" size="icon" onClick={() => del(r.id)} aria-label="ลบลิงก์">
+              <Trash2 className="size-4 text-destructive" />
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+
+/* ---------- Unit Settings ---------- */
+
+function UnitSettingsPage({ projectId }: { projectId: string }) {
+  const { data, isLoading } = useQuery(projectQuery(projectId));
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center">กำลังโหลด...</div>;
+  }
+
+  if (!data) return null;
+
+  return (
+    <div className="min-h-screen">
+      <SiteHeader />
+      <main className="mx-auto max-w-4xl space-y-8 px-4 py-10 sm:px-6">
+        <div>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">ตั้งค่าโครงการ ({data.settings?.name})</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            กรอกรายละเอียดโครงการและแบ่งงวดงาน
+          </p>
+        </div>
+        <ProjectForm settings={(data.settings ?? null) as ProjectSettings | null} projectId={projectId} />
+        <PhasesEditor phases={(data.phases ?? []) as any[]} projectId={projectId} />
+      </main>
+    </div>
+  );
+}
+
+function ProjectForm({ settings, projectId }: { settings: ProjectSettings | null, projectId: string }) {
   const qc = useQueryClient();
   const save = useServerFn(saveSettings);
   const createUpload = useServerFn(createHeroImageUpload);
@@ -142,6 +345,7 @@ function ProjectForm({ settings }: { settings: ProjectSettings | null }) {
     try {
       const r = await save({
         data: {
+          id: projectId,
           title: f.title.trim(),
           subtitle: f.subtitle || null,
           org_name: f.org_name || null,
@@ -158,9 +362,9 @@ function ProjectForm({ settings }: { settings: ProjectSettings | null }) {
           hero_image_path: heroPath,
         },
       });
-      if (!r.ok) return toast.error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง");
+      if (!r.ok) return toast.error("ไม่มีสิทธิ์บันทึกข้อมูล");
       toast.success("บันทึกข้อมูลโครงการแล้ว");
-      qc.invalidateQueries({ queryKey: ["project-data"] });
+      qc.invalidateQueries({ queryKey: ["project-data", projectId] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "บันทึกไม่สำเร็จ");
     } finally {
@@ -199,47 +403,7 @@ function ProjectForm({ settings }: { settings: ProjectSettings | null }) {
         <Field label="เดือนเริ่มต้นของปฏิทิน">
           <Input type="date" value={f.calendar_start_month} onChange={(e) => set("calendar_start_month", e.target.value)} />
         </Field>
-        <Field label="หัวข้อกลุ่มที่ 1">
-          <Input value={f.prep_heading} onChange={(e) => set("prep_heading", e.target.value)} />
-        </Field>
-        <Field label="คำบรรยายกลุ่มที่ 1">
-          <Input value={f.prep_subtitle} onChange={(e) => set("prep_subtitle", e.target.value)} />
-        </Field>
-        <Field label="หัวข้อกลุ่มที่ 2">
-          <Input value={f.cons_heading} onChange={(e) => set("cons_heading", e.target.value)} />
-        </Field>
-        <Field label="คำบรรยายกลุ่มที่ 2">
-          <Input value={f.cons_subtitle} onChange={(e) => set("cons_subtitle", e.target.value)} />
-        </Field>
       </div>
-
-      <div className="rounded-xl border border-dashed p-4">
-        <Label className="text-sm font-medium">รูปนำโครงการ</Label>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {heroPath ? "มีรูปแล้ว — เลือกไฟล์ใหม่เพื่อแทนที่" : "ยังไม่มีรูป — เลือกไฟล์เพื่ออัปโหลด"}
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-2 text-sm hover:bg-muted">
-            <ImagePlus className="size-4" /> เลือกรูป
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void onHeroPick(file);
-                e.target.value = "";
-              }}
-            />
-          </label>
-          {heroPath && (
-            <Button variant="ghost" size="sm" onClick={() => setHeroPath(null)}>
-              ลบรูป
-            </Button>
-          )}
-        </div>
-      </div>
-
       <Button onClick={submit} disabled={busy} className="bg-brand text-brand-foreground hover:bg-brand/90">
         <Save className="mr-1.5 size-4" /> บันทึกข้อมูลโครงการ
       </Button>
@@ -247,9 +411,7 @@ function ProjectForm({ settings }: { settings: ProjectSettings | null }) {
   );
 }
 
-/* ---------- Phases ---------- */
-
-function PhasesEditor({ phases }: { phases: Phase[] }) {
+function PhasesEditor({ phases, projectId }: { phases: any[], projectId: string }) {
   const qc = useQueryClient();
   const save = useServerFn(savePhase);
   const remove = useServerFn(deletePhase);
@@ -262,7 +424,7 @@ function PhasesEditor({ phases }: { phases: Phase[] }) {
   });
   const [busy, setBusy] = useState(false);
 
-  const refresh = () => qc.invalidateQueries({ queryKey: ["project-data"] });
+  const refresh = () => qc.invalidateQueries({ queryKey: ["project-data", projectId] });
 
   async function add() {
     if (!draft.name.trim()) return toast.error("กรุณากรอกชื่อเฟสงาน");
@@ -270,6 +432,7 @@ function PhasesEditor({ phases }: { phases: Phase[] }) {
     try {
       const r = await save({
         data: {
+          project_id: projectId,
           name: draft.name.trim(),
           category: draft.category,
           code: draft.code || null,
@@ -280,7 +443,7 @@ function PhasesEditor({ phases }: { phases: Phase[] }) {
           progress: 0,
         },
       });
-      if (!r.ok) return toast.error("เซสชันหมดอายุ");
+      if (!r.ok) return toast.error("ไม่มีสิทธิ์");
       toast.success("เพิ่มเฟสงานแล้ว");
       setDraft({ name: "", category: draft.category, code: "", weight: "", duration_label: "" });
       refresh();
@@ -291,7 +454,7 @@ function PhasesEditor({ phases }: { phases: Phase[] }) {
 
   async function del(id: string) {
     const r = await remove({ data: { id } });
-    if (!r.ok) return toast.error("เซสชันหมดอายุ");
+    if (!r.ok) return toast.error("ไม่มีสิทธิ์");
     toast.success("ลบเฟสงานแล้ว");
     refresh();
   }
@@ -348,99 +511,6 @@ function PhasesEditor({ phases }: { phases: Phase[] }) {
                 </div>
               </div>
               <Button variant="ghost" size="icon" onClick={() => del(p.id)} aria-label="ลบเฟสงาน">
-                <Trash2 className="size-4 text-destructive" />
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
-  );
-}
-
-/* ---------- Resource links ---------- */
-
-function ResourcesEditor({ links }: { links: ResourceLink[] }) {
-  const qc = useQueryClient();
-  const save = useServerFn(saveResourceLink);
-  const remove = useServerFn(deleteResourceLink);
-  const [draft, setDraft] = useState({ label: "", description: "", url: "", icon: "link" });
-  const [busy, setBusy] = useState(false);
-
-  const refresh = () => qc.invalidateQueries({ queryKey: ["project-data"] });
-
-  async function add() {
-    if (!draft.label.trim() || !draft.url.trim()) return toast.error("กรุณากรอกชื่อและลิงก์");
-    setBusy(true);
-    try {
-      const r = await save({
-        data: {
-          label: draft.label.trim(),
-          description: draft.description || null,
-          url: draft.url.trim(),
-          icon: draft.icon,
-          order: links.length,
-        },
-      });
-      if (!r.ok) return toast.error("เซสชันหมดอายุ");
-      toast.success("เพิ่มลิงก์แล้ว");
-      setDraft({ label: "", description: "", url: "", icon: "link" });
-      refresh();
-    } catch {
-      toast.error("ลิงก์ไม่ถูกต้อง (ต้องขึ้นต้นด้วย https://)");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function del(id: string) {
-    const r = await remove({ data: { id } });
-    if (!r.ok) return toast.error("เซสชันหมดอายุ");
-    toast.success("ลบลิงก์แล้ว");
-    refresh();
-  }
-
-  return (
-    <Card className="space-y-4 p-5">
-      <h2 className="font-display text-lg font-semibold">ลิงก์ทรัพยากรทีมงาน</h2>
-      <div className="grid gap-3 rounded-xl border p-4 sm:grid-cols-2">
-        <Field label="ชื่อลิงก์">
-          <Input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} placeholder="เช่น Google Drive เอกสาร" />
-        </Field>
-        <Field label="ไอคอน">
-          <Select value={draft.icon} onValueChange={(v) => setDraft({ ...draft, icon: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {RESOURCE_ICON_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field label="URL" className="sm:col-span-2">
-          <Input value={draft.url} onChange={(e) => setDraft({ ...draft, url: e.target.value })} placeholder="https://..." />
-        </Field>
-        <Field label="คำอธิบาย" className="sm:col-span-2">
-          <Input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
-        </Field>
-        <div className="sm:col-span-2">
-          <Button onClick={add} disabled={busy} variant="secondary">
-            <Plus className="mr-1.5 size-4" /> เพิ่มลิงก์
-          </Button>
-        </div>
-      </div>
-
-      {links.length === 0 ? (
-        <p className="text-sm text-muted-foreground">ยังไม่มีลิงก์</p>
-      ) : (
-        <ul className="divide-y rounded-xl border">
-          {links.map((r) => (
-            <li key={r.id} className="flex items-center justify-between gap-3 p-3">
-              <div className="min-w-0">
-                <div className="truncate text-sm font-medium">{r.label}</div>
-                <div className="truncate text-xs text-muted-foreground">{r.url}</div>
-              </div>
-              <Button variant="ghost" size="icon" onClick={() => del(r.id)} aria-label="ลบลิงก์">
                 <Trash2 className="size-4 text-destructive" />
               </Button>
             </li>
