@@ -16,6 +16,7 @@ import {
   deleteProject,
   saveUnit,
   deleteUnit,
+  importTemplatePhases,
 } from "@/lib/data.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -28,7 +29,7 @@ import { RESOURCE_ICON_OPTIONS } from "@/components/team-resources";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
-import { ImagePlus, Plus, Save, Trash2, ShieldCheck, Building2, Eye, EyeOff } from "lucide-react";
+import { ImagePlus, Plus, Save, Trash2, ShieldCheck, Building2, Eye, EyeOff, X, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -687,6 +688,43 @@ function ProjectForm({ settings, projectId }: { settings: ProjectSettings | null
         <Field label="เดือนเริ่มต้นของปฏิทิน">
           <Input type="date" value={f.calendar_start_month} onChange={(e) => set("calendar_start_month", e.target.value)} />
         </Field>
+        <Field label="รูปภาพหน้าปก / รูปจำลองอาคาร" className="sm:col-span-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            {heroPath ? (
+              <div className="relative h-20 w-36 overflow-hidden rounded-lg border bg-muted">
+                <img
+                  src={supabase.storage.from("updates").getPublicUrl(heroPath).data.publicUrl}
+                  className="h-full w-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => setHeroPath(null)}
+                  className="absolute right-1 top-1 rounded bg-black/60 p-1 text-white hover:bg-black"
+                >
+                  <X className="size-3" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex h-20 w-36 items-center justify-center rounded-lg border border-dashed bg-muted/30 text-muted-foreground">
+                <ImagePlus className="size-5" />
+              </div>
+            )}
+            <div className="space-y-1">
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onHeroPick(file);
+                }}
+                className="max-w-xs"
+              />
+              <p className="text-xs text-muted-foreground">
+                (แนะนำ) หากไม่ได้อัปโหลดรูป ระบบจะนำภาพล่าสุดจากรายงานความคืบหน้ามาแสดงเป็นหน้าปกโดยอัตโนมัติ
+              </p>
+            </div>
+          </div>
+        </Field>
       </div>
       <Button onClick={submit} disabled={busy} className="bg-brand text-brand-foreground hover:bg-brand/90">
         <Save className="mr-1.5 size-4" /> บันทึกข้อมูลโครงการ
@@ -699,6 +737,7 @@ function PhasesEditor({ phases, projectId }: { phases: any[], projectId: string 
   const qc = useQueryClient();
   const save = useServerFn(savePhase);
   const remove = useServerFn(deletePhase);
+  const importTemplate = useServerFn(importTemplatePhases);
   const [draft, setDraft] = useState({
     name: "",
     category: "preparation" as "preparation" | "construction",
@@ -709,6 +748,25 @@ function PhasesEditor({ phases, projectId }: { phases: any[], projectId: string 
   const [busy, setBusy] = useState(false);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["project-data", projectId] });
+
+  async function handleImportTemplate() {
+    if (phases.length > 0) {
+      if (!window.confirm("โครงการนี้มีเฟสงานอยู่แล้ว การนำเข้าเฟสงานมาตรฐานจะเพิ่มเฟสงานเข้าไปต่อท้าย คุณแน่ใจหรือไม่?")) {
+        return;
+      }
+    }
+    setBusy(true);
+    try {
+      const r = await importTemplate({ data: { projectId } });
+      if (!r.ok) return toast.error("ไม่มีสิทธิ์นำเข้า");
+      toast.success("นำเข้าโครงสร้างเฟสงานมาตรฐาน (15 เตรียมการ + 16 ก่อสร้าง) เรียบร้อยแล้ว!");
+      refresh();
+    } catch (e) {
+      toast.error("เกิดข้อผิดพลาดในการนำเข้า");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function add() {
     if (!draft.name.trim()) return toast.error("กรุณากรอกชื่อเฟสงาน");
@@ -745,7 +803,12 @@ function PhasesEditor({ phases, projectId }: { phases: any[], projectId: string 
 
   return (
     <Card className="space-y-4 p-5">
-      <h2 className="font-display text-lg font-semibold">เฟสงาน / งวดงาน</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="font-display text-lg font-semibold">เฟสงาน / งวดงาน</h2>
+        <Button onClick={handleImportTemplate} disabled={busy} variant="outline" size="sm" className="text-brand border-brand/20 hover:bg-brand/5">
+          <Sparkles className="mr-1.5 size-4 text-brand" /> นำเข้าเฟสงานมาตรฐาน (งวด 1-16)
+        </Button>
+      </div>
 
       <div className="grid gap-3 rounded-xl border p-4 sm:grid-cols-2">
         <Field label="ชื่อเฟสงาน" className="sm:col-span-2">
