@@ -233,7 +233,27 @@ function UnitDashboard({ unitId }: { unitId: string }) {
 /* ---------- Super Admin Dashboard ---------- */
 
 function SuperAdminDashboard() {
-  const { data: units, isLoading, refetch } = useQuery({
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
+
+  // If a unit is selected, show UnitDashboard for that unit
+  if (selectedUnitId) {
+    return (
+      <div>
+        <div className="bg-muted/50 p-3 flex items-center">
+          <Button variant="ghost" onClick={() => setSelectedUnitId(null)}>
+            &larr; กลับไปหน้าจัดการระดับจังหวัด
+          </Button>
+        </div>
+        <UnitDashboard unitId={selectedUnitId} />
+      </div>
+    );
+  }
+
+  return <SuperAdminUnitList onSelectUnit={setSelectedUnitId} />;
+}
+
+function SuperAdminUnitList({ onSelectUnit }: { onSelectUnit: (id: string) => void }) {
+  const { data: units, isLoading } = useQuery({
     queryKey: ["units"],
     queryFn: async () => {
       const { getAllUnitsData } = await import("@/lib/data.functions");
@@ -295,7 +315,7 @@ function SuperAdminDashboard() {
             <h1 className="font-display text-3xl font-semibold tracking-tight">การจัดการระดับจังหวัด (สสจ.)</h1>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            เพิ่ม / ลบ หน่วยบริการในระบบ
+            เพิ่ม / ลบ หน่วยบริการ · คลิกที่หน่วยบริการเพื่อจัดการโครงการ
           </p>
         </div>
 
@@ -336,7 +356,10 @@ function SuperAdminDashboard() {
             <ul className="divide-y rounded-xl border">
               {(units as any[])?.map((u: any) => (
                 <li key={u.id} className="flex items-center justify-between gap-3 p-4 hover:bg-muted/30">
-                  <div className="flex items-center gap-3 min-w-0">
+                  <button
+                    className="flex items-center gap-3 min-w-0 flex-1 text-left"
+                    onClick={() => onSelectUnit(u.id)}
+                  >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                       <Building2 className="size-5" />
                     </div>
@@ -346,8 +369,16 @@ function SuperAdminDashboard() {
                         {u.type} · อ.{u.district}
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-4">
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onSelectUnit(u.id)}
+                      className="text-brand border-brand/30 hover:bg-brand/5"
+                    >
+                      จัดการโครงการ →
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => handleDelete(u.id, u.name)} aria-label="ลบหน่วยบริการ" disabled={busy === u.id}>
                       <Trash2 className="size-4 text-destructive" />
                     </Button>
@@ -366,6 +397,7 @@ function SuperAdminDashboard() {
     </div>
   );
 }
+
 
 function GlobalResourcesEditor() {
   const { data: projects } = useQuery(allProjectsQuery);
