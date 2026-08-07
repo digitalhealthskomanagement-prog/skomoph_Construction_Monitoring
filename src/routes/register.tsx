@@ -28,7 +28,7 @@ function Register() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const setSession = useServerFn(setSessionCookie);
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -61,9 +61,8 @@ function Register() {
     setBusy(true);
     try {
       // 1. Sign up
-      const emailToUse = username.includes("@") ? username : `${username}@skomoph.local`;
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: emailToUse,
+        email,
         password,
       });
 
@@ -126,15 +125,15 @@ function Register() {
         </p>
         <form onSubmit={submit} className="mt-8 w-full space-y-4 rounded-2xl border bg-card p-6 shadow-sm">
           <div className="grid gap-2">
-            <Label htmlFor="username">ชื่อผู้ใช้ (Username)</Label>
+            <Label htmlFor="email">อีเมล</Label>
             <Input
-              id="username"
-              type="text"
+              id="email"
+              type="email"
               autoFocus
               required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="เช่น admin หรือเบอร์โทรศัพท์"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@example.com"
             />
           </div>
           <div className="grid gap-2">
@@ -177,7 +176,7 @@ function Register() {
               </SelectContent>
             </Select>
           </div>
-          <Button type="submit" disabled={busy || !password || !confirmPassword || !username || !projectId} className="w-full mt-2 bg-brand text-brand-foreground hover:bg-brand/90">
+          <Button type="submit" disabled={busy || !password || !confirmPassword || !email || !projectId} className="w-full mt-2 bg-brand text-brand-foreground hover:bg-brand/90">
             <KeyRound className="mr-1.5 size-4" /> {busy ? "กำลังดำเนินการ…" : "สร้างบัญชีผู้ใช้"}
           </Button>
           <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground pt-4">
