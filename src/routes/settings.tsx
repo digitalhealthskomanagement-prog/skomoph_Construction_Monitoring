@@ -155,7 +155,7 @@ function UnitDashboard({ unitId }: { unitId: string }) {
   const handleCreateProject = async () => {
     try {
       setBusy(true);
-      await create({ title: "โครงการใหม่", unitId });
+      await create({ data: { title: "โครงการใหม่", unitId } });
       toast.success("สร้างโครงการสำเร็จ!");
       qc.invalidateQueries({ queryKey: ["all-projects"] });
     } catch (e: any) {

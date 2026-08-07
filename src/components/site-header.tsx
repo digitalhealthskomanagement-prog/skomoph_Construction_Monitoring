@@ -5,6 +5,8 @@ import hospitalLogo from "@/assets/hospital-logo.png";
 import { Button } from "@/components/ui/button";
 import { AUTH_STATUS_QUERY_KEY, type AuthStatus, useAuthStatus } from "@/hooks/use-auth-status";
 import { supabase } from "@/integrations/supabase/client";
+import { clearSessionCookie } from "@/lib/auth.functions";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
 export function SiteHeader() {
@@ -13,13 +15,14 @@ export function SiteHeader() {
   const queryClient = useQueryClient();
   const unlocked = data?.unlocked;
   const isSuperAdmin = data?.role === "super_admin";
+  const clearSession = useServerFn(clearSessionCookie);
 
   async function onLock() {
     await supabase.auth.signOut();
-    queryClient.setQueryData<AuthStatus>(AUTH_STATUS_QUERY_KEY, { unlocked: false, user: null, role: null, projectId: null });
-    toast.success("ออกจากระบบเรียบร้อย");
+    await clearSession();
+    queryClient.setQueryData<AuthStatus>(AUTH_STATUS_QUERY_KEY, { unlocked: false, role: null });
     await queryClient.invalidateQueries({ queryKey: AUTH_STATUS_QUERY_KEY });
-    await router.invalidate();
+    toast.success("ออกจากระบบเรียบร้อย");
     router.navigate({ to: "/" });
   }
 
