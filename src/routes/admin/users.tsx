@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getAllUsers, updateUserRole, deleteUser } from "@/lib/admin.functions";
-import { getAllProjectsData } from "@/lib/data.functions";
+import { getAllUnitsData } from "@/lib/data.functions";
 import {
   Table,
   TableBody,
@@ -33,9 +33,9 @@ function AdminUsersPage() {
     queryFn: () => getAllUsers(),
   });
 
-  const { data: projectsData } = useQuery({
-    queryKey: ["projects"],
-    queryFn: () => getAllProjectsData(),
+  const { data: unitsData } = useQuery({
+    queryKey: ["units"],
+    queryFn: () => getAllUnitsData(),
   });
 
   const updateMutation = useMutation({
@@ -96,7 +96,7 @@ function AdminUsersPage() {
           </TableHeader>
           <TableBody>
             {usersData?.users.map((user) => {
-              const assignedProjects = projectsData?.filter(p => user.project_ids?.includes(p.id)) || [];
+              const assignedUnits = unitsData?.filter(u => user.unit_ids?.includes(u.id)) || [];
               return (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.email}</TableCell>
@@ -110,11 +110,11 @@ function AdminUsersPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {assignedProjects.length > 0 ? (
+                    {assignedUnits.length > 0 ? (
                       <div className="flex flex-wrap gap-1 max-w-[200px]">
-                        {assignedProjects.map(p => (
-                          <span key={p.id} className="text-xs bg-muted px-2 py-0.5 rounded-full whitespace-nowrap">
-                            {p.unit_name}
+                        {assignedUnits.map(u => (
+                          <span key={u.id} className="text-xs bg-muted px-2 py-0.5 rounded-full whitespace-nowrap">
+                            {u.name}
                           </span>
                         ))}
                       </div>
@@ -148,7 +148,7 @@ function AdminUsersPage() {
       {isEditDialogOpen && selectedUser && (
         <EditUserDialog 
           user={selectedUser} 
-          projects={projectsData || []} 
+          units={unitsData || []} 
           isOpen={isEditDialogOpen} 
           onClose={() => setIsEditDialogOpen(false)} 
           onSave={(data) => updateMutation.mutate({ userId: selectedUser.id, ...data })}
@@ -159,13 +159,13 @@ function AdminUsersPage() {
   );
 }
 
-function EditUserDialog({ user, projects, isOpen, onClose, onSave, isPending }: any) {
+function EditUserDialog({ user, units, isOpen, onClose, onSave, isPending }: any) {
   const [role, setRole] = useState(user.role || "unit_admin");
-  const [projectIds, setProjectIds] = useState<string[]>(user.project_ids || []);
+  const [unitIds, setUnitIds] = useState<string[]>(user.unit_ids || []);
 
-  const toggleProject = (id: string) => {
-    setProjectIds(prev => 
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+  const toggleUnit = (id: string) => {
+    setUnitIds(prev => 
+      prev.includes(id) ? prev.filter(u => u !== id) : [...prev, id]
     );
   };
 
@@ -200,15 +200,15 @@ function EditUserDialog({ user, projects, isOpen, onClose, onSave, isPending }: 
               <div className="text-sm text-muted-foreground italic">Super Admin มีสิทธิ์เข้าถึงทุกหน่วยบริการ</div>
             ) : (
               <div className="border rounded-md p-3 max-h-[200px] overflow-y-auto space-y-2">
-                {projects.map((p: any) => (
-                  <div key={p.id} className="flex items-center space-x-2">
+                {units.map((u: any) => (
+                  <div key={u.id} className="flex items-center space-x-2">
                     <Checkbox 
-                      id={`project-${p.id}`} 
-                      checked={projectIds.includes(p.id)}
-                      onCheckedChange={() => toggleProject(p.id)}
+                      id={`unit-${u.id}`} 
+                      checked={unitIds.includes(u.id)}
+                      onCheckedChange={() => toggleUnit(u.id)}
                     />
-                    <Label htmlFor={`project-${p.id}`} className="text-sm font-normal cursor-pointer leading-none">
-                      {p.unit_name || p.title}
+                    <Label htmlFor={`unit-${u.id}`} className="text-sm font-normal cursor-pointer leading-none">
+                      {u.name}
                     </Label>
                   </div>
                 ))}
@@ -218,7 +218,7 @@ function EditUserDialog({ user, projects, isOpen, onClose, onSave, isPending }: 
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isPending}>ยกเลิก</Button>
-          <Button onClick={() => onSave({ role, projectIds: role === "super_admin" ? [] : projectIds })} disabled={isPending}>
+          <Button onClick={() => onSave({ role, unitIds: role === "super_admin" ? [] : unitIds })} disabled={isPending}>
             {isPending ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
           </Button>
         </DialogFooter>

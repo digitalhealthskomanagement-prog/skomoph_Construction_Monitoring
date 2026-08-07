@@ -53,7 +53,22 @@ async function signImages(paths: string[] | null | undefined, fallback: string |
 
 export const getAllProjectsData = createServerFn({ method: "GET" }).handler(async () => {
   const sb = await admin();
-  const { data } = await sb.from("projects").select("*").order("district", { ascending: true });
+  const { data } = await sb.from("projects").select("*, units(*)").order("created_at", { ascending: false });
+  return (data ?? []).map((d: any) => ({
+    ...d,
+    unit_name: d.units?.name,
+    unit_type: d.units?.type,
+    district: d.units?.district,
+    province: d.units?.province,
+    lat: d.units?.lat,
+    lng: d.units?.lng,
+    units: undefined
+  }));
+});
+
+export const getAllUnitsData = createServerFn({ method: "GET" }).handler(async () => {
+  const sb = await admin();
+  const { data } = await sb.from("units").select("*").order("name", { ascending: true });
   return data ?? [];
 });
 
@@ -63,7 +78,7 @@ export const getProjectData = createServerFn({ method: "GET" })
   const sb = await admin();
   const projectId = data.projectId;
   const [settings, phases, events, updatesRaw, risks, resources] = await Promise.all([
-    sb.from("projects").select("*").eq("id", projectId).maybeSingle(),
+    sb.from("projects").select("*, units(*)").eq("id", projectId).maybeSingle(),
     sb.from("phases").select("*").eq("project_id", projectId).order("order", { ascending: true }),
     sb.from("calendar_events").select("*").eq("project_id", projectId).order("start_date", { ascending: true }),
     sb.from("updates").select("*").eq("project_id", projectId).order("created_at", { ascending: false }).limit(50),
@@ -77,7 +92,19 @@ export const getProjectData = createServerFn({ method: "GET" })
       return { ...u, image_url: images[0] ?? null, image_urls: images, thumb_urls: thumbs };
     }),
   );
-  const s = settings.data;
+  let s: any = settings.data;
+  if (s) {
+    s = {
+      ...s,
+      unit_name: s.units?.name,
+      unit_type: s.units?.type,
+      district: s.units?.district,
+      province: s.units?.province,
+      lat: s.units?.lat,
+      lng: s.units?.lng,
+      units: undefined
+    };
+  }
   const heroUrl = await signImage((s as { hero_image_path?: string | null } | null)?.hero_image_path ?? null);
   return {
 
@@ -383,18 +410,72 @@ export const saveSettings = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
-export const createProject = createServerFn({ method: "POST" })
-  .inputValidator((d: { title: string; unit_name: string; unit_type: string; district: string; province: string; }) => d)
+// ---------- Unit management (Super Admin only) ----------
+
+const unitSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().min(1),
+  type: z.string().nullable().optional(),
+  district: z.string().nullable().optional(),
+  province: z.string().default("สระแก้ว"),
+  lat: z.number().nullable().optional(),
+  lng: z.number().nullable().optional(),
+});
+
+export const saveUnit = createServerFn({ method: "POST" })
+  .inputValidator((d: z.infer<typeof unitSchema>) => unitSchema.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (auth.role !== "super_admin") return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked || auth.role !== "super_admin") return { ok: false as const, reason: "unauthorized" as const };
+    
+    const sb = await admin();
+    const payload = {
+      name: data.name,
+      type: data.type ?? null,
+      district: data.district ?? null,
+      province: data.province ?? "สระแก้ว",
+      lat: data.lat ?? null,
+      lng: data.lng ?? null,
+      updated_at: new Date().toISOString(),
+    };
+    
+    if (data.id) {
+      const { error } = await sb.from("units").update(payload).eq("id", data.id);
+      if (error) throw error;
+    } else {
+      const { error } = await sb.from("units").insert(payload);
+      if (error) throw error;
+    }
+    return { ok: true as const };
+  });
+
+export const deleteUnit = createServerFn({ method: "POST" })
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data }) => {
+    const auth = await getAuth();
+    if (!auth.unlocked || auth.role !== "super_admin") return { ok: false as const, reason: "unauthorized" as const };
+    
+    const sb = await admin();
+    const { error } = await sb.from("units").delete().eq("id", data.id);
+    if (error) throw error;
+    return { ok: true as const };
+  });
+
+export const createProject = createServerFn({ method: "POST" })
+  .inputValidator((d: { title: string; unitId: string; }) => d)
+  .handler(async ({ data }) => {
+    const auth = await getAuth();
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
+    
+    // Only super_admin or unit_admin of that unit can create project
+    if (auth.role !== "super_admin" && !auth.unitIds?.includes(data.unitId)) {
+      return { ok: false as const, reason: "unauthorized" as const };
+    }
+    
     const sb = await admin();
     const { error } = await sb.from("projects").insert({
       title: data.title,
-      unit_name: data.unit_name,
-      unit_type: data.unit_type,
-      district: data.district,
-      province: data.province,
+      unit_id: data.unitId,
       start_date: new Date().toISOString().split("T")[0],
       end_date: new Date().toISOString().split("T")[0],
       is_active: true,
@@ -407,10 +488,17 @@ export const deleteProject = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string; }) => d)
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (auth.role !== "super_admin") return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
     const sb = await admin();
-    // Delete user roles first to avoid foreign key constraints
-    await sb.from("user_roles").delete().eq("project_id", data.id);
+    
+    // Check if they are super admin, or they have access to this project's unit
+    if (auth.role !== "super_admin") {
+      const { data: proj } = await sb.from("projects").select("unit_id").eq("id", data.id).single();
+      if (!proj || !auth.unitIds?.includes(proj.unit_id)) {
+        return { ok: false as const, reason: "unauthorized" as const };
+      }
+    }
+    
     const { error } = await sb.from("projects").delete().eq("id", data.id);
     if (error) throw error;
     return { ok: true as const };

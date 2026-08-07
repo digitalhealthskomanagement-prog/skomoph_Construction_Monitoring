@@ -19,20 +19,20 @@ export const getAllUsers = createServerFn({ method: "GET" })
     // 3. Fetch user_roles
     const { data: rolesData, error: rolesError } = await supabaseAdmin
       .from("user_roles")
-      .select("user_id, role, project_id");
+      .select("user_id, role, unit_id");
     if (rolesError) throw new Error(rolesError.message);
 
     // 4. Combine data
     const users = authData.users.map(u => {
       const userRoles = rolesData.filter(r => r.user_id === u.id);
       const role = userRoles.some(r => r.role === "super_admin") ? "super_admin" : (userRoles.length > 0 ? "unit_admin" : null);
-      const projectIds = userRoles.map(r => r.project_id).filter(Boolean);
+      const unitIds = userRoles.map(r => r.unit_id).filter(Boolean);
       return {
         id: u.id,
         email: u.email,
         created_at: u.created_at,
         role: role,
-        project_ids: projectIds,
+        unit_ids: unitIds,
       };
     });
 
@@ -43,7 +43,7 @@ export const updateUserRole = createServerFn({ method: "POST" })
   .inputValidator(z.object({
     userId: z.string(),
     role: z.enum(["super_admin", "unit_admin"]),
-    projectIds: z.array(z.string()).default([]),
+    unitIds: z.array(z.string()).default([]),
   }))
   .handler(async ({ data }) => {
     const { getAuthContext } = await import("./auth.server");
@@ -62,16 +62,20 @@ export const updateUserRole = createServerFn({ method: "POST" })
       .eq("user_id", data.userId);
 
     // 3. Insert new roles
-    if (data.role === "super_admin" || data.projectIds.length === 0) {
-      const { error } = await supabaseAdmin
-        .from("user_roles")
-        .insert({ user_id: data.userId, role: data.role, project_id: null });
-      if (error) throw new Error(error.message);
-    } else {
-      const inserts = data.projectIds.map(pid => ({
+     if (data.role === "super_admin") {
+      await supabaseAdmin.from("user_roles").insert({
         user_id: data.userId,
-        role: data.role,
-        project_id: pid
+        role: "super_admin",
+        unit_id: null
+      });
+    } else {
+      if (data.unitIds.length === 0) {
+        throw new Error("Unit Admin must have at least one unit assigned");
+      }
+      const inserts = data.unitIds.map(uid => ({
+        user_id: data.userId,
+        role: "unit_admin",
+        unit_id: uid
       }));
       const { error } = await supabaseAdmin
         .from("user_roles")

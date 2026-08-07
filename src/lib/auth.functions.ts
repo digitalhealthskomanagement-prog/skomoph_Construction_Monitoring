@@ -21,18 +21,18 @@ export const setSessionCookie = createServerFn({ method: "POST" })
     // Fetch all roles for user
     let { data: roleDataArray } = await supabaseAdmin
       .from("user_roles")
-      .select("role, project_id")
+      .select("role, unit_id")
       .eq("user_id", user.id);
 
     let role = null;
-    let projectIds: string[] = [];
+    let unitIds: string[] = [];
     
     if (roleDataArray && roleDataArray.length > 0) {
       if (roleDataArray.some(r => r.role === "super_admin")) {
         role = "super_admin";
       } else {
         role = "unit_admin";
-        projectIds = roleDataArray.map(r => r.project_id).filter(Boolean) as string[];
+        unitIds = roleDataArray.map(r => r.unit_id).filter(Boolean) as string[];
       }
     }
 
@@ -41,7 +41,7 @@ export const setSessionCookie = createServerFn({ method: "POST" })
       const { data: newRole } = await supabaseAdmin.from("user_roles").insert({
         user_id: user.id,
         role: "super_admin",
-        project_id: null
+        unit_id: null
       }).select().single();
       if (newRole) {
         role = "super_admin";
@@ -53,8 +53,7 @@ export const setSessionCookie = createServerFn({ method: "POST" })
       unlocked: true,
       userId: user.id,
       role: role,
-      projectId: projectIds.length > 0 ? projectIds[0] : null,
-      projectIds: projectIds,
+      unitIds: unitIds,
     });
 
     return { ok: true as const };
@@ -75,8 +74,7 @@ export const getAuthStatus = createServerFn({ method: "GET" }).handler(
       unlocked: ctx.unlocked,
       userId: ctx.userId,
       role: ctx.role,
-      projectId: ctx.projectId,
-      projectIds: ctx.projectIds
+      unitIds: ctx.unitIds
     };
   }
 );

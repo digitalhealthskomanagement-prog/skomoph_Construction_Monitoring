@@ -4,8 +4,7 @@ export type AuthSession = {
   unlocked?: boolean;
   userId?: string;
   role?: "super_admin" | "unit_admin" | null;
-  projectId?: string | null;
-  projectIds?: string[];
+  unitIds?: string[];
 };
 
 function cookieOptions() {
@@ -39,7 +38,6 @@ export async function getAuthContext() {
     unlocked: Boolean(session.data.unlocked),
     userId: session.data.userId,
     role: session.data.role,
-    projectId: session.data.projectId,
-    projectIds: session.data.projectIds || [],
+    unitIds: session.data.unitIds || [],
   };
 }

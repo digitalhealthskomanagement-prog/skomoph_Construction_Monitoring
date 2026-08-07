@@ -14,6 +14,8 @@ import {
   deleteResourceLink,
   createProject,
   deleteProject,
+  saveUnit,
+  deleteUnit,
 } from "@/lib/data.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -65,27 +67,110 @@ function SettingsRouter() {
     return <SuperAdminDashboard />;
   }
 
-  if (auth.role === "unit_admin" && auth.projectIds && auth.projectIds.length > 0) {
-    if (auth.projectIds.length === 1) {
-      return <UnitSettingsPage projectId={auth.projectIds[0]} />;
+  if (auth.role === "unit_admin" && auth.unitIds && auth.unitIds.length > 0) {
+    if (auth.unitIds.length === 1) {
+      return <UnitDashboard unitId={auth.unitIds[0]} />;
     } else {
-      return <UnitProjectSelector projectIds={auth.projectIds} />;
+      return <UnitSelector unitIds={auth.unitIds} />;
     }
   }
 
   return <div className="p-8 text-center">คุณไม่มีสิทธิ์เข้าถึงหน้านี้ หรือไม่ได้ผูกกับหน่วยบริการใด</div>;
 }
 
-function UnitProjectSelector({ projectIds }: { projectIds: string[] }) {
+function UnitSelector({ unitIds }: { unitIds: string[] }) {
+  const { data: units, isLoading } = useQuery({
+    queryKey: ["units"],
+    queryFn: async () => {
+      const { getAllUnitsData } = await import("@/lib/data.functions");
+      return getAllUnitsData();
+    }
+  });
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
+
+  if (selectedUnitId) {
+    return (
+      <div>
+        <div className="bg-muted/50 p-3 flex items-center justify-between">
+          <Button variant="ghost" onClick={() => setSelectedUnitId(null)}>
+            &larr; กลับไปเลือกหน่วยบริการอื่น
+          </Button>
+        </div>
+        <UnitDashboard unitId={selectedUnitId} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen">
+      <SiteHeader />
+      <main className="mx-auto max-w-4xl space-y-8 px-4 py-10 sm:px-6">
+        <div>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">เลือกหน่วยบริการที่ต้องการจัดการ</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            บัญชีของคุณได้รับสิทธิ์ดูแลหลายหน่วยบริการ กรุณาเลือกหน่วยบริการที่ต้องการตั้งค่า
+          </p>
+        </div>
+        
+        <Card className="p-5">
+          {isLoading ? (
+            <p>กำลังโหลด...</p>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {units?.filter((u: any) => unitIds.includes(u.id)).map((u: any) => (
+                <div key={u.id} className="rounded-xl border p-5 flex flex-col gap-4 hover:border-brand transition-colors cursor-pointer" onClick={() => setSelectedUnitId(u.id)}>
+                  <div>
+                    <h3 className="font-medium text-lg">{u.name}</h3>
+                    <p className="text-sm text-muted-foreground">{u.district}</p>
+                  </div>
+                  <Button className="w-full mt-auto" variant="outline">จัดการหน่วยบริการนี้</Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </main>
+    </div>
+  );
+}
+
+function UnitDashboard({ unitId }: { unitId: string }) {
   const { data: projects, isLoading } = useQuery(allProjectsQuery);
+  const { data: units } = useQuery({
+    queryKey: ["units"],
+    queryFn: async () => {
+      const { getAllUnitsData } = await import("@/lib/data.functions");
+      return getAllUnitsData();
+    }
+  });
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  
+  const unit = units?.find((u: any) => u.id === unitId);
+  const unitProjects = projects?.filter(p => p.unit_id === unitId) || [];
+
+  const create = useServerFn(createProject);
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+
+  const handleCreateProject = async () => {
+    try {
+      setBusy(true);
+      await create({ title: "โครงการใหม่", unitId });
+      toast.success("สร้างโครงการสำเร็จ!");
+      qc.invalidateQueries({ queryKey: ["all-projects"] });
+    } catch (e: any) {
+      toast.error("สร้างไม่สำเร็จ: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (selectedProjectId) {
     return (
       <div>
         <div className="bg-muted/50 p-3 flex items-center justify-between">
           <Button variant="ghost" onClick={() => setSelectedProjectId(null)}>
-            &larr; กลับไปเลือกโครงการอื่น
+            &larr; กลับไปหน้าหน่วยบริการ
           </Button>
         </div>
         <UnitSettingsPage projectId={selectedProjectId} />
@@ -97,25 +182,44 @@ function UnitProjectSelector({ projectIds }: { projectIds: string[] }) {
     <div className="min-h-screen">
       <SiteHeader />
       <main className="mx-auto max-w-4xl space-y-8 px-4 py-10 sm:px-6">
-        <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">เลือกโครงการที่ต้องการจัดการ</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            บัญชีของคุณได้รับสิทธิ์ดูแลหลายโครงการ กรุณาเลือกโครงการที่ต้องการตั้งค่า
-          </p>
+        <div className="flex justify-between items-end">
+          <div>
+            <h1 className="font-display text-3xl font-semibold tracking-tight">หน่วยบริการ: {unit?.name || "กำลังโหลด..."}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              จัดการโครงการก่อสร้างทั้งหมดของหน่วยบริการนี้
+            </p>
+          </div>
+          <Button onClick={handleCreateProject} disabled={busy}>
+            <Plus className="mr-2 h-4 w-4" /> เพิ่มโครงการใหม่
+          </Button>
         </div>
         
         <Card className="p-5">
           {isLoading ? (
-            <p>กำลังโหลด...</p>
+            <p>กำลังโหลดโครงการ...</p>
+          ) : unitProjects.length === 0 ? (
+            <div className="text-center py-10">
+              <p className="text-muted-foreground mb-4">ยังไม่มีโครงการในหน่วยบริการนี้</p>
+              <Button onClick={handleCreateProject} variant="outline" disabled={busy}>
+                สร้างโครงการแรก
+              </Button>
+            </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
-              {projects?.filter(p => projectIds.includes(p.id)).map(p => (
+              {unitProjects.map(p => (
                 <div key={p.id} className="rounded-xl border p-5 flex flex-col gap-4 hover:border-brand transition-colors cursor-pointer" onClick={() => setSelectedProjectId(p.id)}>
                   <div>
-                    <h3 className="font-medium text-lg">{p.title || p.unit_name}</h3>
-                    <p className="text-sm text-muted-foreground">{p.unit_name}</p>
+                    <h3 className="font-medium text-lg">{p.title || "โครงการไม่มีชื่อ"}</h3>
+                    <p className="text-sm text-muted-foreground">{p.subtitle || "-"}</p>
                   </div>
-                  <Button className="w-full mt-auto" variant="outline">จัดการโครงการนี้</Button>
+                  <div className="flex items-center justify-between mt-auto pt-4 border-t">
+                    <span className="text-xs text-muted-foreground">
+                      งบ: {p.budget_baht ? p.budget_baht.toLocaleString() : 0} บ.
+                    </span>
+                    <span className="text-xs font-medium text-brand">
+                      คืบหน้า: {p.total_progress}%
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -218,14 +322,11 @@ function SuperAdminDashboard() {
         <Card className="p-5">
           <h2 className="font-display text-lg font-semibold mb-4">เพิ่มหน่วยบริการใหม่</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="ชื่อโครงการเริ่มต้น">
-              <Input value={newProject.title} onChange={(e) => setNewProject({ ...newProject, title: e.target.value })} placeholder="เช่น โครงการก่อสร้าง..." />
-            </Field>
             <Field label="ชื่อหน่วยบริการ">
-              <Input value={newProject.unit_name} onChange={(e) => setNewProject({ ...newProject, unit_name: e.target.value })} placeholder="เช่น รพ.เขาฉกรรจ์" />
+              <Input value={newUnit.name} onChange={(e) => setNewUnit({ ...newUnit, name: e.target.value })} placeholder="เช่น รพ.เขาฉกรรจ์" />
             </Field>
             <Field label="ประเภทหน่วยบริการ">
-              <Select value={newProject.unit_type} onValueChange={(v) => setNewProject({ ...newProject, unit_type: v })}>
+              <Select value={newUnit.type} onValueChange={(v) => setNewUnit({ ...newUnit, type: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="รพ.">รพ.</SelectItem>
@@ -237,10 +338,10 @@ function SuperAdminDashboard() {
               </Select>
             </Field>
             <Field label="อำเภอ">
-              <Input value={newProject.district} onChange={(e) => setNewProject({ ...newProject, district: e.target.value })} placeholder="เช่น เขาฉกรรจ์" />
+              <Input value={newUnit.district} onChange={(e) => setNewUnit({ ...newUnit, district: e.target.value })} placeholder="เช่น เขาฉกรรจ์" />
             </Field>
             <div className="sm:col-span-2 lg:col-span-3">
-              <Button onClick={handleAddProject} disabled={isAdding} className="bg-brand text-brand-foreground hover:bg-brand/90">
+              <Button onClick={handleAddUnit} disabled={isAdding} className="bg-brand text-brand-foreground hover:bg-brand/90">
                 <Plus className="mr-1.5 size-4" /> เพิ่มหน่วยบริการ
               </Button>
             </div>
@@ -253,41 +354,30 @@ function SuperAdminDashboard() {
             <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
           ) : (
             <ul className="divide-y rounded-xl border">
-              {projects?.map((p) => (
-                <li key={p.id} className="flex items-center justify-between gap-3 p-4 hover:bg-muted/30">
+              {units?.map((u: any) => (
+                <li key={u.id} className="flex items-center justify-between gap-3 p-4 hover:bg-muted/30">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                       <Building2 className="size-5" />
                     </div>
                     <div className="min-w-0">
-                      <div className="truncate font-medium">{p.unit_name || p.title || p.name}</div>
+                      <div className="truncate font-medium">{u.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {p.unit_type} · อ.{p.district}
+                        {u.type} · อ.{u.district}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor={`active-${p.id}`} className="text-xs text-muted-foreground hidden sm:inline-block">
-                        {p.is_active ? "เปิดใช้งาน" : "ซ่อน"}
-                      </Label>
-                      <Switch 
-                        id={`active-${p.id}`}
-                        checked={p.is_active} 
-                        disabled={busy === p.id}
-                        onCheckedChange={() => toggleActive(p)} 
-                      />
-                    </div>
-                    <Link to="/projects/$projectId" params={{ projectId: p.id }} className="text-brand hover:underline text-sm font-medium">
-                      ดูข้อมูล &rarr;
+                    <Link to="/settings" onClick={() => window.location.href = `/settings?unitId=${u.id}`} className="text-brand hover:underline text-sm font-medium">
+                      ดูโครงการ &rarr;
                     </Link>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id, p.unit_name || p.title || p.name)} aria-label="ลบโครงการ" disabled={busy === p.id}>
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(u.id, u.name)} aria-label="ลบหน่วยบริการ" disabled={busy === u.id}>
                       <Trash2 className="size-4 text-destructive" />
                     </Button>
                   </div>
                 </li>
               ))}
-              {(!projects || projects.length === 0) && (
+              {(!units || units.length === 0) && (
                 <li className="p-4 text-sm text-center text-muted-foreground">ไม่พบหน่วยบริการ</li>
               )}
             </ul>

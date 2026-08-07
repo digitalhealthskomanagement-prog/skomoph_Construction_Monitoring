@@ -20,6 +20,7 @@ export type ProjectSettings = {
   cons_heading?: string | null;
   cons_subtitle?: string | null;
   calendar_start_month?: string | null;
+  unit_id?: string | null;
   unit_name?: string | null;
   unit_type?: string | null;
   district?: string | null;
