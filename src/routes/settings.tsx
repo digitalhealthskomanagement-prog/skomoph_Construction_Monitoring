@@ -753,6 +753,7 @@ function ProjectForm({ settings, projectId }: { settings: ProjectSettings | null
               </p>
             </div>
           </div>
+        </Field>
         <Field label="สถานะโครงการ" className="sm:col-span-2">
           <div className="flex items-center gap-2">
             <Switch
