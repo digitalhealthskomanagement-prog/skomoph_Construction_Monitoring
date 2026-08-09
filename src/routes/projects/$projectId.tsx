@@ -198,11 +198,18 @@ function Home() {
             <div>
               <div className="mb-3 flex items-baseline justify-between">
                 <h2 className="font-display text-xl font-semibold">รายงานอัปเดตล่าสุด</h2>
-                <Link to="/updates" className="text-sm text-primary hover:underline">ดูทั้งหมด →</Link>
+                <Link to="/projects/$projectId/updates" params={{ projectId: params.projectId }} className="text-sm text-primary hover:underline">
+                  ดูทั้งหมด →
+                </Link>
               </div>
               {data.updates.length === 0 ? (
-                <div className="rounded-xl border border-dashed bg-card/50 p-6 text-sm text-muted-foreground">
-                  ยังไม่มีรายงาน — เข้าสู่ระบบแล้วโพสต์รายงานได้ที่หน้า “รายงานอัปเดต”
+                <div className="rounded-xl border border-dashed bg-card/50 p-6 text-center text-sm text-muted-foreground">
+                  <p className="mb-3">ยังไม่มีรายงานความคืบหน้าก่อสร้างสำหรับโครงการนี้</p>
+                  <Link to="/projects/$projectId/updates" params={{ projectId: params.projectId }}>
+                    <Button variant="outline" size="sm">
+                      {editable ? "เขียนรายงานอัปเดตใหม่" : "ดูหน้าเขียนรายงานอัปเดต"}
+                    </Button>
+                  </Link>
                 </div>
               ) : (
                 <UpdatesList updates={data.updates.slice(0, 3)} phases={data.phases} editable={editable} />
