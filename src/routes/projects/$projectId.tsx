@@ -6,7 +6,7 @@ import { ProgressDonut } from "@/components/progress-donut";
 import { PhaseList } from "@/components/phase-list";
 import { CalendarGrid, type CalEvent } from "@/components/calendar-grid";
 import { EventDialog } from "@/components/event-dialog";
-import { UpdatesList } from "@/components/updates";
+import { UpdatesList, UpdateComposer } from "@/components/updates";
 import { TeamResources } from "@/components/team-resources";
 import { CategoryProgress } from "@/components/category-progress";
 import { SCurve } from "@/components/s-curve";
@@ -48,6 +48,7 @@ function Home() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogEvent, setDialogEvent] = useState<CalEvent | null>(null);
   const [dialogDate, setDialogDate] = useState<Date | null>(null);
+  const [showAllUpdates, setShowAllUpdates] = useState(false);
 
   const settings = data.settings as ProjectSettings | null;
   const resources = (data.resources ?? []) as ResourceLink[];
@@ -195,24 +196,37 @@ function Home() {
               }}
             />
 
-            <div>
-              <div className="mb-3 flex items-baseline justify-between">
-                <h2 className="font-display text-xl font-semibold">รายงานอัปเดตล่าสุด</h2>
-                <Link to="/projects/$projectId/updates" params={{ projectId: params.projectId }} className="text-sm text-primary hover:underline">
-                  ดูทั้งหมด →
-                </Link>
+            <div className="space-y-6">
+              <div className="flex items-baseline justify-between border-b pb-3">
+                <h2 className="font-display text-xl font-bold text-neutral-900">รายงานอัปเดตความคืบหน้า</h2>
+                {data.updates.length > 3 && (
+                  <button 
+                    onClick={() => setShowAllUpdates(!showAllUpdates)} 
+                    className="text-sm font-semibold text-primary hover:underline"
+                  >
+                    {showAllUpdates ? "← ย่อรายการ" : `ดูทั้งหมด (${data.updates.length}) →`}
+                  </button>
+                )}
               </div>
-              {data.updates.length === 0 ? (
-                <div className="rounded-xl border border-dashed bg-card/50 p-6 text-center text-sm text-muted-foreground">
-                  <p className="mb-3">ยังไม่มีรายงานความคืบหน้าก่อสร้างสำหรับโครงการนี้</p>
-                  <Link to="/projects/$projectId/updates" params={{ projectId: params.projectId }}>
-                    <Button variant="outline" size="sm">
-                      {editable ? "เขียนรายงานอัปเดตใหม่" : "ดูหน้าเขียนรายงานอัปเดต"}
-                    </Button>
-                  </Link>
+
+              {editable && (
+                <div className="bg-white p-1 rounded-2xl border border-neutral-100 shadow-sm">
+                  <UpdateComposer phases={data.phases} />
                 </div>
+              )}
+
+              {data.updates.length === 0 ? (
+                !editable ? (
+                  <div className="rounded-xl border border-dashed bg-card/50 p-6 text-center text-sm text-muted-foreground">
+                    ยังไม่มีรายงานความคืบหน้าก่อสร้างสำหรับโครงการนี้
+                  </div>
+                ) : null
               ) : (
-                <UpdatesList updates={data.updates.slice(0, 3)} phases={data.phases} editable={editable} />
+                <UpdatesList 
+                  updates={showAllUpdates ? data.updates : data.updates.slice(0, 3)} 
+                  phases={data.phases} 
+                  editable={editable} 
+                />
               )}
             </div>
           </div>
