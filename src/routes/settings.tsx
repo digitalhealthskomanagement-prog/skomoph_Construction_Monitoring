@@ -31,7 +31,14 @@ import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
 import { ImagePlus, Plus, Save, Trash2, ShieldCheck, Building2, Eye, EyeOff, X, Sparkles } from "lucide-react";
 
+import { z } from "zod";
+
+const settingsSearchSchema = z.object({
+  projectId: z.string().uuid().optional(),
+});
+
 export const Route = createFileRoute("/settings")({
+  validateSearch: (search) => settingsSearchSchema.parse(search),
   head: () => ({
     meta: [
       { title: "ตั้งค่าระบบ — ระบบติดตามงานก่อสร้าง" },
@@ -43,6 +50,8 @@ export const Route = createFileRoute("/settings")({
 });
 
 function SettingsRouter() {
+  const { projectId } = Route.useSearch();
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(projectId || null);
   const { data: auth, isLoading: authLoading } = useAuthStatus();
 
   if (authLoading) {
@@ -59,6 +68,23 @@ function SettingsRouter() {
           <Link to="/login" className="mt-5 inline-block">
             <Button className="bg-brand text-brand-foreground hover:bg-brand/90">เข้าสู่ระบบ</Button>
           </Link>
+        </main>
+      </div>
+    );
+  }
+
+  // If a projectId search param or state is set, render the UnitSettingsPage directly
+  if (selectedProjectId) {
+    return (
+      <div className="min-h-screen">
+        <SiteHeader />
+        <main className="mx-auto max-w-4xl space-y-6 px-4 py-10 sm:px-6">
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" onClick={() => setSelectedProjectId(null)}>
+              &larr; ย้อนกลับ
+            </Button>
+          </div>
+          <UnitSettingsPage projectId={selectedProjectId} />
         </main>
       </div>
     );
@@ -652,6 +678,7 @@ function ProjectForm({ settings, projectId }: { settings: ProjectSettings | null
       if (!r.ok) return toast.error("ไม่มีสิทธิ์บันทึกข้อมูล");
       toast.success("บันทึกข้อมูลโครงการแล้ว");
       qc.invalidateQueries({ queryKey: ["project-data", projectId] });
+      qc.invalidateQueries({ queryKey: ["all-projects"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "บันทึกไม่สำเร็จ");
     } finally {
@@ -758,7 +785,10 @@ function PhasesEditor({ phases, projectId }: { phases: any[], projectId: string 
   });
   const [busy, setBusy] = useState(false);
 
-  const refresh = () => qc.invalidateQueries({ queryKey: ["project-data", projectId] });
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["project-data", projectId] });
+    qc.invalidateQueries({ queryKey: ["all-projects"] });
+  };
 
   async function handleImportTemplate() {
     if (phases.length > 0) {

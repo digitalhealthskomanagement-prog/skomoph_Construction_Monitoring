@@ -43,6 +43,7 @@ function Home() {
   const { query } = Route.useLoaderData();
   const { data } = useSuspenseQuery(query);
   const { data: auth } = useAuthStatus();
+  const params = Route.useParams();
   const editable = !!auth?.unlocked;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogEvent, setDialogEvent] = useState<CalEvent | null>(null);
@@ -86,7 +87,7 @@ function Home() {
                   <ImagePlus className="size-10" />
                   <p className="text-sm">ยังไม่มีรูปนำโครงการ</p>
                   {editable && (
-                    <Link to="/settings">
+                    <Link to="/settings" search={{ projectId: params.projectId }}>
                       <Button size="sm" variant="secondary">อัปโหลดรูปโครงการ</Button>
                     </Link>
                   )}
@@ -136,7 +137,7 @@ function Home() {
                   <div className="rounded-lg border border-brand/20 bg-brand-soft px-4 py-3 text-sm font-medium text-primary">
                     เข้าสู่ระบบแล้ว — แตะวันที่ในปฏิทินเพื่อเพิ่มรายการ และแก้ไข % ความคืบหน้าได้ทันที
                   </div>
-                  <Link to="/settings">
+                  <Link to="/settings" search={{ projectId: params.projectId }}>
                     <Button variant="outline">
                       <Settings2 className="mr-1.5 size-4" /> ตั้งค่าโครงการ
                     </Button>

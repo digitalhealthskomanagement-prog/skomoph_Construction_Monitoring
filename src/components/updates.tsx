@@ -185,6 +185,7 @@ export function UpdateComposer({ phases }: { phases: Phase[] }) {
       toast.success("โพสต์อัปเดตแล้ว");
       setTitle(""); setBody(""); setFiles([]);
       qc.invalidateQueries({ queryKey: ["project-data"] });
+      qc.invalidateQueries({ queryKey: ["all-projects"] });
     } catch (e) {
       console.error("postUpdate failed", e);
       toast.error(`โพสต์ไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`);
@@ -289,6 +290,7 @@ export function UpdatesList({ updates, phases, editable }: { updates: Update[]; 
     }
     toast.success("ลบแล้ว");
     qc.invalidateQueries({ queryKey: ["project-data"] });
+    qc.invalidateQueries({ queryKey: ["all-projects"] });
   }
 
   if (updates.length === 0) {
