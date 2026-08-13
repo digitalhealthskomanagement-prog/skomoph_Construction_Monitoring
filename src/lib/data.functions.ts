@@ -42,8 +42,8 @@ async function signImage(path: string | null): Promise<string | null> {
   if (!path) return null;
   if (path.startsWith("http")) return path;
   const sb = await admin();
-  const { data } = await sb.storage.from("updates").createSignedUrl(path, 60 * 60 * 24 * 7);
-  return data?.signedUrl ?? null;
+  const { data } = sb.storage.from("updates").getPublicUrl(path);
+  return data.publicUrl;
 }
 
 async function signImages(paths: string[] | null | undefined, fallback: string | null): Promise<string[]> {
