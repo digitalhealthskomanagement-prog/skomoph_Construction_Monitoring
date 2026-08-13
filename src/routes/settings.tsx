@@ -788,7 +788,7 @@ function PhasesEditor({ phases, projectId }: { phases: any[], projectId: string 
   const qc = useQueryClient();
   const save = useServerFn(savePhase);
   const remove = useServerFn(deletePhase);
-  const importTemplate = useServerFn(importTemplatePhases);
+
   const [draft, setDraft] = useState({
     id: undefined as string | undefined,
     name: "",
