@@ -57,51 +57,47 @@ function SettingsRouter() {
     return <div className="min-h-screen flex items-center justify-center">กำลังโหลด...</div>;
   }
 
+  let content;
+
   if (!auth?.unlocked) {
-    return (
-      <div className="min-h-screen">
-        <SiteHeader />
-        <main className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6">
-          <h1 className="font-display text-2xl font-semibold">ต้องเข้าสู่ระบบทีมงาน</h1>
-          <p className="mt-2 text-sm text-muted-foreground">หน้าตั้งค่าโครงการสำหรับผู้ที่เข้าสู่ระบบเท่านั้น</p>
-          <Link to="/login" className="mt-5 inline-block">
-            <Button className="bg-brand text-brand-foreground hover:bg-brand/90">เข้าสู่ระบบ</Button>
-          </Link>
-        </main>
-      </div>
+    content = (
+      <main className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6">
+        <h1 className="font-display text-2xl font-semibold">ต้องเข้าสู่ระบบทีมงาน</h1>
+        <p className="mt-2 text-sm text-muted-foreground">หน้าตั้งค่าโครงการสำหรับผู้ที่เข้าสู่ระบบเท่านั้น</p>
+        <Link to="/login" className="mt-5 inline-block">
+          <Button className="bg-brand text-brand-foreground hover:bg-brand/90">เข้าสู่ระบบ</Button>
+        </Link>
+      </main>
     );
-  }
-
-  // If a projectId search param or state is set, render the UnitSettingsPage directly
-  if (selectedProjectId) {
-    return (
-      <div className="min-h-screen">
-        <SiteHeader />
-        <main className="mx-auto max-w-4xl space-y-6 px-4 py-10 sm:px-6">
-          <div className="flex items-center justify-between">
-            <Button variant="ghost" onClick={() => setSelectedProjectId(null)}>
-              &larr; ย้อนกลับ
-            </Button>
-          </div>
-          <UnitSettingsPage projectId={selectedProjectId} />
-        </main>
-      </div>
+  } else if (selectedProjectId) {
+    content = (
+      <>
+        <div className="bg-muted/50 p-3 flex items-center justify-between">
+          <Button variant="ghost" onClick={() => setSelectedProjectId(null)}>
+            &larr; ย้อนกลับ
+          </Button>
+        </div>
+        <UnitSettingsPage projectId={selectedProjectId} />
+      </>
     );
-  }
-
-  if (auth.role === "super_admin") {
-    return <SuperAdminDashboard />;
-  }
-
-  if (auth.role === "unit_admin" && auth.unitIds && auth.unitIds.length > 0) {
+  } else if (auth.role === "super_admin") {
+    content = <SuperAdminDashboard />;
+  } else if (auth.role === "unit_admin" && auth.unitIds && auth.unitIds.length > 0) {
     if (auth.unitIds.length === 1) {
-      return <UnitDashboard unitId={auth.unitIds[0]} />;
+      content = <UnitDashboard unitId={auth.unitIds[0]} />;
     } else {
-      return <UnitSelector unitIds={auth.unitIds} />;
+      content = <UnitSelector unitIds={auth.unitIds} />;
     }
+  } else {
+    content = <div className="p-8 text-center">คุณไม่มีสิทธิ์เข้าถึงหน้านี้ หรือไม่ได้ผูกกับหน่วยบริการใด</div>;
   }
 
-  return <div className="p-8 text-center">คุณไม่มีสิทธิ์เข้าถึงหน้านี้ หรือไม่ได้ผูกกับหน่วยบริการใด</div>;
+  return (
+    <div className="min-h-screen">
+      <SiteHeader />
+      {content}
+    </div>
+  );
 }
 
 function UnitSelector({ unitIds }: { unitIds: string[] }) {
@@ -128,8 +124,7 @@ function UnitSelector({ unitIds }: { unitIds: string[] }) {
   }
 
   return (
-    <div className="min-h-screen">
-      <SiteHeader />
+    <>
       <main className="mx-auto max-w-4xl space-y-8 px-4 py-10 sm:px-6">
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight">เลือกหน่วยบริการที่ต้องการจัดการ</h1>
@@ -156,7 +151,7 @@ function UnitSelector({ unitIds }: { unitIds: string[] }) {
           )}
         </Card>
       </main>
-    </div>
+    </>
   );
 }
 
@@ -225,8 +220,7 @@ function UnitDashboard({ unitId }: { unitId: string }) {
   }
 
   return (
-    <div className="min-h-screen">
-      <SiteHeader />
+    <>
       <main className="mx-auto max-w-4xl space-y-8 px-4 py-10 sm:px-6">
         <div className="flex justify-between items-end">
           <div>
@@ -304,7 +298,7 @@ function UnitDashboard({ unitId }: { unitId: string }) {
           )}
         </Card>
       </main>
-    </div>
+    </>
   );
 }
 
@@ -384,95 +378,92 @@ function SuperAdminUnitList({ onSelectUnit }: { onSelectUnit: (id: string) => vo
   }
 
   return (
-    <div className="min-h-screen">
-      <SiteHeader />
-      <main className="mx-auto max-w-4xl space-y-8 px-4 py-10 sm:px-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="size-6 text-brand" />
-            <h1 className="font-display text-3xl font-semibold tracking-tight">การจัดการระดับจังหวัด (สสจ.)</h1>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            เพิ่ม / ลบ หน่วยบริการ · คลิกที่หน่วยบริการเพื่อจัดการโครงการ
-          </p>
+    <main className="mx-auto max-w-4xl space-y-8 px-4 py-10 sm:px-6">
+      <div>
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="size-6 text-brand" />
+          <h1 className="font-display text-3xl font-semibold tracking-tight">การจัดการระดับจังหวัด (สสจ.)</h1>
         </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          เพิ่ม / ลบ หน่วยบริการ · คลิกที่หน่วยบริการเพื่อจัดการโครงการ
+        </p>
+      </div>
 
-        <Card className="p-5">
-          <h2 className="font-display text-lg font-semibold mb-4">เพิ่มหน่วยบริการใหม่</h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="ชื่อหน่วยบริการ">
-              <Input value={newUnit.name} onChange={(e) => setNewUnit({ ...newUnit, name: e.target.value })} placeholder="เช่น รพ.เขาฉกรรจ์" />
-            </Field>
-            <Field label="ประเภทหน่วยบริการ">
-              <Select value={newUnit.type} onValueChange={(v) => setNewUnit({ ...newUnit, type: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="รพ.">รพ.</SelectItem>
-                  <SelectItem value="รพ.สต.">รพ.สต.</SelectItem>
-                  <SelectItem value="สสจ.">สสจ.</SelectItem>
-                  <SelectItem value="สสอ.">สสอ.</SelectItem>
-                  <SelectItem value="อื่นๆ">อื่นๆ</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="อำเภอ">
-              <Input value={newUnit.district} onChange={(e) => setNewUnit({ ...newUnit, district: e.target.value })} placeholder="เช่น เขาฉกรรจ์" />
-            </Field>
-            <div className="sm:col-span-2 lg:col-span-3">
-              <Button onClick={handleAddUnit} disabled={isAdding} className="bg-brand text-brand-foreground hover:bg-brand/90">
-                <Plus className="mr-1.5 size-4" /> เพิ่มหน่วยบริการ
-              </Button>
-            </div>
+      <Card className="p-5">
+        <h2 className="font-display text-lg font-semibold mb-4">เพิ่มหน่วยบริการใหม่</h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="ชื่อหน่วยบริการ">
+            <Input value={newUnit.name} onChange={(e) => setNewUnit({ ...newUnit, name: e.target.value })} placeholder="เช่น รพ.เขาฉกรรจ์" />
+          </Field>
+          <Field label="ประเภทหน่วยบริการ">
+            <Select value={newUnit.type} onValueChange={(v) => setNewUnit({ ...newUnit, type: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="รพ.">รพ.</SelectItem>
+                <SelectItem value="รพ.สต.">รพ.สต.</SelectItem>
+                <SelectItem value="สสจ.">สสจ.</SelectItem>
+                <SelectItem value="สสอ.">สสอ.</SelectItem>
+                <SelectItem value="อื่นๆ">อื่นๆ</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="อำเภอ">
+            <Input value={newUnit.district} onChange={(e) => setNewUnit({ ...newUnit, district: e.target.value })} placeholder="เช่น เขาฉกรรจ์" />
+          </Field>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <Button onClick={handleAddUnit} disabled={isAdding} className="bg-brand text-brand-foreground hover:bg-brand/90">
+              <Plus className="mr-1.5 size-4" /> เพิ่มหน่วยบริการ
+            </Button>
           </div>
-        </Card>
+        </div>
+      </Card>
 
-        <Card className="p-5">
-          <h2 className="font-display text-lg font-semibold mb-4">รายชื่อหน่วยบริการทั้งหมด</h2>
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
-          ) : (
-            <ul className="divide-y rounded-xl border">
-              {(units as any[])?.map((u: any) => (
-                <li key={u.id} className="flex items-center justify-between gap-3 p-4 hover:bg-muted/30">
-                  <button
-                    className="flex items-center gap-3 min-w-0 flex-1 text-left"
-                    onClick={() => onSelectUnit(u.id)}
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <Building2 className="size-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{u.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {u.type} · อ.{u.district}
-                      </div>
-                    </div>
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onSelectUnit(u.id)}
-                      className="text-brand border-brand/30 hover:bg-brand/5"
-                    >
-                      จัดการโครงการ →
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(u.id, u.name)} aria-label="ลบหน่วยบริการ" disabled={busy === u.id}>
-                      <Trash2 className="size-4 text-destructive" />
-                    </Button>
+      <Card className="p-5">
+        <h2 className="font-display text-lg font-semibold mb-4">รายชื่อหน่วยบริการทั้งหมด</h2>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">กำลังโหลด...</p>
+        ) : (
+          <ul className="divide-y rounded-xl border">
+            {(units as any[])?.map((u: any) => (
+              <li key={u.id} className="flex items-center justify-between gap-3 p-4 hover:bg-muted/30">
+                <button
+                  className="flex items-center gap-3 min-w-0 flex-1 text-left"
+                  onClick={() => onSelectUnit(u.id)}
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Building2 className="size-5" />
                   </div>
-                </li>
-              ))}
-              {(!units || (units as any[]).length === 0) && (
-                <li className="p-4 text-sm text-center text-muted-foreground">ไม่พบหน่วยบริการ</li>
-              )}
-            </ul>
-          )}
-        </Card>
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{u.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {u.type} · อ.{u.district}
+                    </div>
+                  </div>
+                </button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onSelectUnit(u.id)}
+                    className="text-brand border-brand/30 hover:bg-brand/5"
+                  >
+                    จัดการโครงการ →
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => handleDelete(u.id, u.name)} aria-label="ลบหน่วยบริการ" disabled={busy === u.id}>
+                    <Trash2 className="size-4 text-destructive" />
+                  </Button>
+                </div>
+              </li>
+            ))}
+            {(!units || (units as any[]).length === 0) && (
+              <li className="p-4 text-sm text-center text-muted-foreground">ไม่พบหน่วยบริการ</li>
+            )}
+          </ul>
+        )}
+      </Card>
 
-        <GlobalResourcesEditor />
-      </main>
-    </div>
+      <GlobalResourcesEditor />
+    </main>
   );
 }
 
