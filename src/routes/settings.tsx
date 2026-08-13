@@ -16,7 +16,6 @@ import {
   deleteProject,
   saveUnit,
   deleteUnit,
-  importTemplatePhases,
 } from "@/lib/data.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -617,6 +616,7 @@ function ProjectForm({ settings, projectId }: { settings: ProjectSettings | null
     start_date: settings?.start_date ?? "",
     end_date: settings?.end_date ?? "",
     budget_baht: settings?.budget_baht != null ? String(settings.budget_baht) : "",
+    budget_source: settings?.budget_source ?? "",
     calendar_start_month: settings?.calendar_start_month ?? "",
     prep_heading: settings?.prep_heading ?? "ขั้นเตรียมการ",
     prep_subtitle: settings?.prep_subtitle ?? "",
@@ -666,6 +666,7 @@ function ProjectForm({ settings, projectId }: { settings: ProjectSettings | null
           start_date: f.start_date,
           end_date: f.end_date,
           budget_baht: f.budget_baht ? Number(f.budget_baht) : null,
+          budget_source: f.budget_source && f.budget_source !== "none" ? f.budget_source : null,
           calendar_start_month: f.calendar_start_month || null,
           prep_heading: f.prep_heading || null,
           prep_subtitle: f.prep_subtitle || null,
@@ -704,6 +705,17 @@ function ProjectForm({ settings, projectId }: { settings: ProjectSettings | null
         </Field>
         <Field label="งบประมาณ (บาท)">
           <Input type="number" value={f.budget_baht} onChange={(e) => set("budget_baht", e.target.value)} placeholder="เช่น 250000000" />
+        </Field>
+        <Field label="แหล่งงบประมาณ">
+          <Select value={f.budget_source} onValueChange={(v) => set("budget_source", v)}>
+            <SelectTrigger><SelectValue placeholder="เลือกแหล่งงบประมาณ" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">-- ไม่ระบุ --</SelectItem>
+              <SelectItem value="เงินบำรุงของหน่วยบริการ">เงินบำรุงของหน่วยบริการ</SelectItem>
+              <SelectItem value="เงินงบประมาณ">เงินงบประมาณ</SelectItem>
+              <SelectItem value="งบค่าเสื่อม">งบค่าเสื่อม</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
         <Field label="คำอธิบายหน้าแรก" className="sm:col-span-2">
           <Textarea value={f.intro_text} onChange={(e) => set("intro_text", e.target.value)} rows={2} />
@@ -778,6 +790,7 @@ function PhasesEditor({ phases, projectId }: { phases: any[], projectId: string 
   const remove = useServerFn(deletePhase);
   const importTemplate = useServerFn(importTemplatePhases);
   const [draft, setDraft] = useState({
+    id: undefined as string | undefined,
     name: "",
     category: "preparation" as "preparation" | "construction",
     code: "",
@@ -791,31 +804,13 @@ function PhasesEditor({ phases, projectId }: { phases: any[], projectId: string 
     qc.invalidateQueries({ queryKey: ["all-projects"] });
   };
 
-  async function handleImportTemplate() {
-    if (phases.length > 0) {
-      if (!window.confirm("โครงการนี้มีเฟสงานอยู่แล้ว การนำเข้าเฟสงานมาตรฐานจะเพิ่มเฟสงานเข้าไปต่อท้าย คุณแน่ใจหรือไม่?")) {
-        return;
-      }
-    }
-    setBusy(true);
-    try {
-      const r = await importTemplate({ data: { projectId } });
-      if (!r.ok) return toast.error("ไม่มีสิทธิ์นำเข้า");
-      toast.success("นำเข้าโครงสร้างเฟสงานมาตรฐาน (15 เตรียมการ + 16 ก่อสร้าง) เรียบร้อยแล้ว!");
-      refresh();
-    } catch (e) {
-      toast.error("เกิดข้อผิดพลาดในการนำเข้า");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function add() {
     if (!draft.name.trim()) return toast.error("กรุณากรอกชื่อเฟสงาน");
     setBusy(true);
     try {
       const r = await save({
         data: {
+          id: draft.id,
           project_id: projectId,
           name: draft.name.trim(),
           category: draft.category,
@@ -823,17 +818,29 @@ function PhasesEditor({ phases, projectId }: { phases: any[], projectId: string 
           weight: draft.weight ? Number(draft.weight) : null,
           duration_label: draft.duration_label || null,
           color: "#0ea5e9",
-          order: phases.length,
-          progress: 0,
+          order: draft.id ? phases.find(p => p.id === draft.id)?.order ?? phases.length : phases.length,
+          progress: draft.id ? phases.find(p => p.id === draft.id)?.progress ?? 0 : 0,
         },
       });
       if (!r.ok) return toast.error("ไม่มีสิทธิ์");
-      toast.success("เพิ่มเฟสงานแล้ว");
-      setDraft({ name: "", category: draft.category, code: "", weight: "", duration_label: "" });
+      toast.success(draft.id ? "แก้ไขเฟสงานแล้ว" : "เพิ่มเฟสงานแล้ว");
+      setDraft({ id: undefined, name: "", category: draft.category, code: "", weight: "", duration_label: "" });
       refresh();
     } finally {
       setBusy(false);
     }
+  }
+
+  function edit(p: any) {
+    setDraft({
+      id: p.id,
+      name: p.name,
+      category: p.category,
+      code: p.code || "",
+      weight: p.weight != null ? String(p.weight) : "",
+      duration_label: p.duration_label || "",
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function del(id: string) {
@@ -847,8 +854,8 @@ function PhasesEditor({ phases, projectId }: { phases: any[], projectId: string 
     <Card className="space-y-4 p-5">
       <div className="flex items-center justify-between">
         <h2 className="font-display text-lg font-semibold">เฟสงาน / งวดงาน</h2>
-        <Button onClick={handleImportTemplate} disabled={busy} variant="outline" size="sm" className="text-brand border-brand/20 hover:bg-brand/5">
-          <Sparkles className="mr-1.5 size-4 text-brand" /> นำเข้าเฟสงานมาตรฐาน (งวด 1-16)
+        <Button disabled variant="outline" size="sm" className="text-muted-foreground" title="Coming soon">
+          <Sparkles className="mr-1.5 size-4" /> นำเข้าจาก PDF (AI)
         </Button>
       </div>
 
@@ -874,10 +881,15 @@ function PhasesEditor({ phases, projectId }: { phases: any[], projectId: string 
         <Field label="ระยะเวลา">
           <Input value={draft.duration_label} onChange={(e) => setDraft({ ...draft, duration_label: e.target.value })} placeholder="เช่น 45 วัน" />
         </Field>
-        <div className="sm:col-span-2">
+        <div className="sm:col-span-2 flex gap-2">
           <Button onClick={add} disabled={busy} variant="secondary">
-            <Plus className="mr-1.5 size-4" /> เพิ่มเฟสงาน
+            <Plus className="mr-1.5 size-4" /> {draft.id ? "บันทึกการแก้ไข" : "เพิ่มเฟสงาน"}
           </Button>
+          {draft.id && (
+            <Button onClick={() => setDraft({ id: undefined, name: "", category: "preparation", code: "", weight: "", duration_label: "" })} variant="ghost">
+              ยกเลิก
+            </Button>
+          )}
         </div>
       </div>
 
@@ -899,9 +911,15 @@ function PhasesEditor({ phases, projectId }: { phases: any[], projectId: string 
                   {` · ${Number(p.progress).toFixed(0)}%`}
                 </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => del(p.id)} aria-label="ลบเฟสงาน">
-                <Trash2 className="size-4 text-destructive" />
-              </Button>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="icon" onClick={() => edit(p)} aria-label="แก้ไขเฟสงาน">
+                  <Plus className="size-4 rotate-45 text-muted-foreground" style={{ transform: "rotate(0deg)" }} /> {/* TODO: maybe change icon, use some generic or just Edit text, let's use some other icon from lucide, but since I don't want to import, I will use a simple Edit text or another existing icon */}
+                  <span className="text-xs">แก้ไข</span>
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => del(p.id)} aria-label="ลบเฟสงาน">
+                  <Trash2 className="size-4 text-destructive" />
+                </Button>
+              </div>
             </li>
           ))}
         </ul>

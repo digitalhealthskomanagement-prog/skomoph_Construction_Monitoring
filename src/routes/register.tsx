@@ -31,17 +31,17 @@ function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [projectId, setProjectId] = useState("");
+  const [unitId, setUnitId] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // Fetch all projects for selection
-  const { data: projects, isLoading: projectsLoading } = useQuery({
-    queryKey: ["all-projects"],
+  // Fetch all units for selection
+  const { data: units, isLoading: unitsLoading } = useQuery({
+    queryKey: ["all-units"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("projects")
-        .select("id, unit_name, title")
-        .order("unit_name");
+        .from("units")
+        .select("id, name, type")
+        .order("name");
       if (error) throw error;
       return data;
     },
@@ -49,7 +49,7 @@ function Register() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!projectId) {
+    if (!unitId) {
       toast.error("กรุณาเลือกหน่วยบริการ");
       return;
     }
@@ -73,10 +73,11 @@ function Register() {
 
       if (authData.user) {
         // 2. Insert into user_roles
-        const isSsj = projectId === "b7e842b7-f646-4d47-8f82-829a862b3a3f";
+        const selectedUnit = units?.find(u => u.id === unitId);
+        const isSsj = selectedUnit?.type === "สสจ." || selectedUnit?.name.includes("สสจ");
         const rolePayload = {
           user_id: authData.user.id,
-          project_id: projectId,
+          unit_id: unitId,
           role: isSsj ? "super_admin" : "unit_admin",
         };
         
@@ -100,7 +101,7 @@ function Register() {
             unlocked: true,
             userId: authData.user?.id,
             role: isSsj ? "super_admin" : "unit_admin",
-            projectId: projectId,
+            unitId: unitId,
           }));
         }
         
@@ -162,21 +163,23 @@ function Register() {
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="project">หน่วยบริการที่สังกัด</Label>
-            <Select value={projectId} onValueChange={setProjectId}>
+            <Label htmlFor="unit">หน่วยบริการที่สังกัด</Label>
+            <Select value={unitId} onValueChange={setUnitId}>
               <SelectTrigger>
-                <SelectValue placeholder={projectsLoading ? "กำลังโหลด..." : "เลือกหน่วยบริการ..."} />
+                <SelectValue placeholder={unitsLoading ? "กำลังโหลด..." : "เลือกหน่วยบริการ..."} />
               </SelectTrigger>
               <SelectContent>
-                {projects?.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.unit_name || p.title}
+                {units?.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    <div className="max-w-[250px] truncate" title={u.name}>
+                      {u.name}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <Button type="submit" disabled={busy || !password || !confirmPassword || !email || !projectId} className="w-full mt-2 bg-brand text-brand-foreground hover:bg-brand/90">
+          <Button type="submit" disabled={busy || !password || !confirmPassword || !email || !unitId} className="w-full mt-2 bg-brand text-brand-foreground hover:bg-brand/90">
             <KeyRound className="mr-1.5 size-4" /> {busy ? "กำลังดำเนินการ…" : "สร้างบัญชีผู้ใช้"}
           </Button>
           <div className="flex flex-col items-center gap-2 text-xs text-muted-foreground pt-4">

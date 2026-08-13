@@ -411,6 +411,7 @@ const settingsSchema = z.object({
   start_date: z.string(),
   end_date: z.string(),
   budget_baht: z.number().nullable().optional(),
+  budget_source: z.string().nullable().optional(),
   org_name: z.string().nullable().optional(),
   org_tagline: z.string().nullable().optional(),
   intro_text: z.string().nullable().optional(),
@@ -503,14 +504,35 @@ export const createProject = createServerFn({ method: "POST" })
     }
     
     const sb = await admin();
-    const { error } = await sb.from("projects").insert({
+    const { data: proj, error } = await sb.from("projects").insert({
       title: data.title,
       unit_id: data.unitId,
       start_date: new Date().toISOString().split("T")[0],
       end_date: new Date().toISOString().split("T")[0],
       is_active: true,
-    });
-    if (error) throw error;
+    }).select("id").single();
+    if (error || !proj) throw error ?? new Error("Failed to create project");
+
+    // Insert default preparation phases
+    const defaultPhases = [
+      { category: 'preparation', code: '1.1', name: 'เสนอแต่งตั้งคณะกรรมการกำหนดขอบเขตงาน (TOR) และราคากลาง', order: 101, color: '#0ea5e9', duration_label: '5 วัน', start_date: '2026-09-01', end_date: '2026-09-05', project_id: proj.id, progress: 0 },
+      { category: 'preparation', code: '1.2', name: 'คณะกรรมการฯ จัดทำแบบรูปรายการและราคากลาง', order: 102, color: '#0ea5e9', duration_label: '20 วัน', start_date: '2026-09-06', end_date: '2026-09-25', project_id: proj.id, progress: 0 },
+      { category: 'preparation', code: '1.3', name: 'เสนอรายงานผลราคากลาง และขอความเห็นชอบ', order: 103, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-09-26', end_date: '2026-09-26', project_id: proj.id, progress: 0 },
+      { category: 'preparation', code: '1.4', name: 'จัดทำรายงานขอซื้อขอจ้าง พร้อมแต่งตั้งคณะกรรมการพิจารณาผลฯ', order: 104, color: '#0ea5e9', duration_label: '6 วัน', start_date: '2026-09-27', end_date: '2026-10-02', project_id: proj.id, progress: 0 },
+      { category: 'preparation', code: '1.5', name: 'เผยแพร่ร่างประกาศเพื่อรับฟังคำวิจารณ์ (7 วันทำการ)', order: 105, color: '#0ea5e9', duration_label: '11 วัน', start_date: '2026-10-03', end_date: '2026-10-13', project_id: proj.id, progress: 0 },
+      { category: 'preparation', code: '1.6', name: 'รายงานผลรับฟังความคิดเห็น และผู้บริหารลงนามประกาศเชิญชวน', order: 106, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-10-14', end_date: '2026-10-14', project_id: proj.id, progress: 0 },
+      { category: 'preparation', code: '1.7', name: 'เผยแพร่ประกาศประกวดราคา e-bidding (20 วันทำการ)', order: 107, color: '#0ea5e9', duration_label: '28 วัน', start_date: '2026-10-15', end_date: '2026-11-11', project_id: proj.id, progress: 0 },
+      { category: 'preparation', code: '1.8', name: 'ผู้เสนอราคายื่นข้อเสนอทางระบบอิเล็กทรอนิกส์', order: 108, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-11-12', end_date: '2026-11-12', project_id: proj.id, progress: 0 },
+      { category: 'preparation', code: '1.9', name: 'คณะกรรมการพิจารณาผลการประกวดราคาฯ', order: 109, color: '#0ea5e9', duration_label: '5 วัน', start_date: '2026-11-13', end_date: '2026-11-17', project_id: proj.id, progress: 0 },
+      { category: 'preparation', code: '1.10', name: 'รายงานผลการพิจารณาให้ผู้มีอำนาจลงนาม', order: 110, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-11-18', end_date: '2026-11-18', project_id: proj.id, progress: 0 },
+      { category: 'preparation', code: '1.11', name: 'ประกาศผู้ชนะการเสนอราคา', order: 111, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-11-19', end_date: '2026-11-19', project_id: proj.id, progress: 0 },
+      { category: 'preparation', code: '1.12', name: 'เว้นระยะเวลาอุทธรณ์ (7 วันทำการ)', order: 112, color: '#0ea5e9', duration_label: '11 วัน', start_date: '2026-11-20', end_date: '2026-11-30', project_id: proj.id, progress: 0 },
+      { category: 'preparation', code: '1.13', name: 'รายงานผลอุทธรณ์ / เสนอผู้บริหารเรียกทำสัญญา', order: 113, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-12-01', end_date: '2026-12-01', project_id: proj.id, progress: 0 },
+      { category: 'preparation', code: '1.14', name: 'ผู้รับจ้างเตรียมหลักประกัน และตรวจสอบเอกสารเพื่อลงนาม', order: 114, color: '#0ea5e9', duration_label: '17 วัน', start_date: '2026-12-02', end_date: '2026-12-18', project_id: proj.id, progress: 0 },
+      { category: 'preparation', code: '1.15', name: 'ผู้มีอำนาจลงนามสัญญาจ้างก่อสร้าง (เริ่มต้นนับเวลาก่อสร้าง)', order: 115, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-12-19', end_date: '2026-12-19', project_id: proj.id, progress: 0 },
+    ];
+    await sb.from("phases").insert(defaultPhases);
+
     return { ok: true as const };
   });
 
@@ -529,57 +551,6 @@ export const deleteProject = createServerFn({ method: "POST" })
       }
     }
     const { error } = await sb.from("projects").delete().eq("id", data.id);
-    if (error) throw error;
-    return { ok: true as const };
-  });
-
-export const importTemplatePhases = createServerFn({ method: "POST" })
-  .inputValidator((d: { projectId: string }) => d)
-  .handler(async ({ data }) => {
-    const auth = await getAuth();
-    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
-    const sb = await admin();
-
-    // Check project permission
-    const access = await verifyProjectAccess(auth, sb, "projects", data.projectId);
-    if (!access) return { ok: false as const, reason: "unauthorized" as const };
-
-    const defaultPhases = [
-      { category: 'preparation', code: '1.1', name: 'เสนอแต่งตั้งคณะกรรมการกำหนดขอบเขตงาน (TOR) และราคากลาง', order: 101, color: '#0ea5e9', duration_label: '5 วัน', start_date: '2026-09-01', end_date: '2026-09-05', project_id: data.projectId, progress: 0 },
-      { category: 'preparation', code: '1.2', name: 'คณะกรรมการฯ จัดทำแบบรูปรายการและราคากลาง', order: 102, color: '#0ea5e9', duration_label: '20 วัน', start_date: '2026-09-06', end_date: '2026-09-25', project_id: data.projectId, progress: 0 },
-      { category: 'preparation', code: '1.3', name: 'เสนอรายงานผลราคากลาง และขอความเห็นชอบ', order: 103, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-09-26', end_date: '2026-09-26', project_id: data.projectId, progress: 0 },
-      { category: 'preparation', code: '1.4', name: 'จัดทำรายงานขอซื้อขอจ้าง พร้อมแต่งตั้งคณะกรรมการพิจารณาผลฯ', order: 104, color: '#0ea5e9', duration_label: '6 วัน', start_date: '2026-09-27', end_date: '2026-10-02', project_id: data.projectId, progress: 0 },
-      { category: 'preparation', code: '1.5', name: 'เผยแพร่ร่างประกาศเพื่อรับฟังคำวิจารณ์ (7 วันทำการ)', order: 105, color: '#0ea5e9', duration_label: '11 วัน', start_date: '2026-10-03', end_date: '2026-10-13', project_id: data.projectId, progress: 0 },
-      { category: 'preparation', code: '1.6', name: 'รายงานผลรับฟังความคิดเห็น และผู้บริหารลงนามประกาศเชิญชวน', order: 106, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-10-14', end_date: '2026-10-14', project_id: data.projectId, progress: 0 },
-      { category: 'preparation', code: '1.7', name: 'เผยแพร่ประกาศประกวดราคา e-bidding (20 วันทำการ)', order: 107, color: '#0ea5e9', duration_label: '28 วัน', start_date: '2026-10-15', end_date: '2026-11-11', project_id: data.projectId, progress: 0 },
-      { category: 'preparation', code: '1.8', name: 'ผู้เสนอราคายื่นข้อเสนอทางระบบอิเล็กทรอนิกส์', order: 108, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-11-12', end_date: '2026-11-12', project_id: data.projectId, progress: 0 },
-      { category: 'preparation', code: '1.9', name: 'คณะกรรมการพิจารณาผลการประกวดราคาฯ', order: 109, color: '#0ea5e9', duration_label: '5 วัน', start_date: '2026-11-13', end_date: '2026-11-17', project_id: data.projectId, progress: 0 },
-      { category: 'preparation', code: '1.10', name: 'รายงานผลการพิจารณาให้ผู้มีอำนาจลงนาม', order: 110, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-11-18', end_date: '2026-11-18', project_id: data.projectId, progress: 0 },
-      { category: 'preparation', code: '1.11', name: 'ประกาศผู้ชนะการเสนอราคา', order: 111, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-11-19', end_date: '2026-11-19', project_id: data.projectId, progress: 0 },
-      { category: 'preparation', code: '1.12', name: 'เว้นระยะเวลาอุทธรณ์ (7 วันทำการ)', order: 112, color: '#0ea5e9', duration_label: '11 วัน', start_date: '2026-11-20', end_date: '2026-11-30', project_id: data.projectId, progress: 0 },
-      { category: 'preparation', code: '1.13', name: 'รายงานผลอุทธรณ์ / เสนอผู้บริหารเรียกทำสัญญา', order: 113, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-12-01', end_date: '2026-12-01', project_id: data.projectId, progress: 0 },
-      { category: 'preparation', code: '1.14', name: 'ผู้รับจ้างเตรียมหลักประกัน และตรวจสอบเอกสารเพื่อลงนาม', order: 114, color: '#0ea5e9', duration_label: '17 วัน', start_date: '2026-12-02', end_date: '2026-12-18', project_id: data.projectId, progress: 0 },
-      { category: 'preparation', code: '1.15', name: 'ผู้มีอำนาจลงนามสัญญาจ้างก่อสร้าง (เริ่มต้นนับเวลาก่อสร้าง)', order: 115, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-12-19', end_date: '2026-12-19', project_id: data.projectId, progress: 0 },
-      
-      { category: 'construction', code: 'งวดที่ 1', name: 'รื้อถอน, ปรับพื้นที่, ปักผัง, เจาะสำรวจดิน, ก่อสร้างเสาเข็มและทดสอบ', order: 201, color: '#f59e0b', duration_label: 'ภายใน 90 วัน', weight: 4.00, start_date: '2026-12-19', end_date: '2027-03-19', project_id: data.projectId, progress: 0 },
-      { category: 'construction', code: 'งวดที่ 2', name: 'ก่อสร้างฐานราก, ตอม่อ, ถังเก็บน้ำใต้ดิน, ช่องลิฟต์/ผนัง ค.ส.ล. ชั้น 1, เดินท่อระบบ', order: 202, color: '#f59e0b', duration_label: 'ภายใน 150 วัน', weight: 3.50, start_date: '2027-03-20', end_date: '2027-05-18', project_id: data.projectId, progress: 0 },
-      { category: 'construction', code: 'งวดที่ 3', name: 'โครงสร้างพื้น-คาน ชั้น 1, บันได, เสารับชั้น 2, ช่องลิฟต์ชั้น 2, ฝังท่อในคอนกรีต', order: 203, color: '#f59e0b', duration_label: 'ภายใน 180 วัน', weight: 3.00, start_date: '2027-05-19', end_date: '2027-06-17', project_id: data.projectId, progress: 0 },
-      { category: 'construction', code: 'งวดที่ 4', name: 'โครงสร้างพื้น-คาน ชั้น 2, บันได, เสารับชั้น 3, ช่องลิฟต์ชั้น 3, ฝังท่อในคอนกรีต', order: 204, color: '#f59e0b', duration_label: 'ภายใน 210 วัน', weight: 2.50, start_date: '2027-06-18', end_date: '2027-07-17', project_id: data.projectId, progress: 0 },
-      { category: 'construction', code: 'งวดที่ 5', name: 'โครงสร้างพื้น-คาน ชั้น 3, เสารับชั้น 4, ก่ออิฐชั้น 1, เดินท่อระบบสุขาภิบาล/ไฟฟ้าชั้น 1', order: 205, color: '#f59e0b', duration_label: 'ภายใน 240 วัน', weight: 3.00, start_date: '2027-07-18', end_date: '2027-08-16', project_id: data.projectId, progress: 0 },
-      { category: 'construction', code: 'งวดที่ 6', name: 'โครงสร้างพื้น-คาน ชั้น 4, เสารับชั้น 5, ก่ออิฐชั้น 2, เดินท่อระบบชั้น 1-2', order: 206, color: '#f59e0b', duration_label: 'ภายใน 270 วัน', weight: 4.00, start_date: '2027-08-17', end_date: '2027-09-15', project_id: data.projectId, progress: 0 },
-      { category: 'construction', code: 'งวดที่ 7', name: 'โครงสร้างพื้น-คาน ชั้น 5, เสารับชั้นดาดฟ้า, ก่ออิฐชั้น 3, ฉาบปูนชั้น 1, เดินท่อระบบชั้น 2-3', order: 207, color: '#f59e0b', duration_label: 'ภายใน 315 วัน', weight: 4.25, start_date: '2027-09-16', end_date: '2027-10-30', project_id: data.projectId, progress: 0 },
-      { category: 'construction', code: 'งวดที่ 8', name: 'โครงสร้างพื้นดาดฟ้า, หลังคา, ก่ออิฐชั้น 4, ฉาบปูนชั้น 2, ปูกระเบื้อง/หินขัดชั้น 1', order: 208, color: '#f59e0b', duration_label: 'ภายใน 360 วัน', weight: 5.25, start_date: '2027-10-31', end_date: '2027-12-14', project_id: data.projectId, progress: 0 },
-      { category: 'construction', code: 'งวดที่ 9', name: 'ก่ออิฐส่วนที่เหลือ, ฉาบปูนชั้น 3, ปูกระเบื้อง/หินขัดชั้น 2, เดินท่อ/สายไฟชั้น 3-5', order: 209, color: '#f59e0b', duration_label: 'ภายใน 405 วัน', weight: 3.00, start_date: '2027-12-15', end_date: '2028-01-28', project_id: data.projectId, progress: 0 },
-      { category: 'construction', code: 'งวดที่ 10', name: 'ฉาบปูนชั้น 4, ปูกระเบื้อง/หินขัดชั้น 3, ติดตั้งถังน้ำสแตนเลส, เดินท่อเมนแนวดิ่งทั้งหมด', order: 210, color: '#f59e0b', duration_label: 'ภายใน 450 วัน', weight: 2.50, start_date: '2028-01-29', end_date: '2028-03-14', project_id: data.projectId, progress: 0 },
-      { category: 'construction', code: 'งวดที่ 11', name: 'ติดตั้งฝ้าเพดานชั้น 1-2, ฉาบปูนภายนอก/ภายในที่เหลือ, งานพื้นชั้น 4, บ่อพักน้ำ/ท่อระบาย', order: 211, color: '#f59e0b', duration_label: 'ภายใน 500 วัน', weight: 6.50, start_date: '2028-03-15', end_date: '2028-05-03', project_id: data.projectId, progress: 0 },
-      { category: 'construction', code: 'งวดที่ 12', name: 'ติดตั้งฝ้าชั้น 3-4, ปูกระเบื้องที่เหลือ, ติดตั้งผนังห้องผ่าตัด, ประตู-หน้าต่างชั้น 1-2', order: 212, color: '#f59e0b', duration_label: 'ภายใน 545 วัน', weight: 10.00, start_date: '2028-05-04', end_date: '2028-06-17', project_id: data.projectId, progress: 0 },
-      { category: 'construction', code: 'งวดที่ 13', name: 'ฝ้าเพดานที่เหลือ, ผิวพื้นภายนอก, ประตู-หน้าต่างชั้น 3-4, สุขภัณฑ์, แอร์ชั้น 4-5, ทาสีรองพื้น', order: 213, color: '#f59e0b', duration_label: 'ภายใน 590 วัน', weight: 9.50, start_date: '2028-06-18', end_date: '2028-08-01', project_id: data.projectId, progress: 0 },
-      { category: 'construction', code: 'งวดที่ 14', name: 'ตกแต่งแผ่นคอมโพสิท, กันซึมหลังคา, ติดตั้งเครื่องกำเนิดไฟฟ้า, ระบบกันฟ้าผ่า, ทาสีจริงชั้น 1-2', order: 214, color: '#f59e0b', duration_label: 'ภายใน 640 วัน', weight: 14.00, start_date: '2028-08-02', end_date: '2028-09-20', project_id: data.projectId, progress: 0 },
-      { category: 'construction', code: 'งวดที่ 15', name: 'กระเบื้องยาง, หม้อแปลงไฟฟ้า, ลิฟต์, ระบบสื่อสาร (โทรศัพท์, CCTV, เรียกพยาบาล)', order: 215, color: '#f59e0b', duration_label: 'ภายใน 685 วัน', weight: 10.00, start_date: '2028-09-21', end_date: '2028-11-04', project_id: data.projectId, progress: 0 },
-      { category: 'construction', code: 'งวดที่ 16', name: 'ทาสีที่เหลือ, ติดตั้งอุปกรณ์จ่ายแก๊ส, ทดสอบระบบ, ส่งคู่มือ/As-Built (BIM), ทำความสะอาด', order: 216, color: '#f59e0b', duration_label: 'ภายใน 730 วัน', weight: 15.00, start_date: '2028-11-05', end_date: '2028-12-19', project_id: data.projectId, progress: 0 }
-    ];
-
-    const { error } = await sb.from("phases").insert(defaultPhases);
     if (error) throw error;
     return { ok: true as const };
   });

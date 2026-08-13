@@ -9,6 +9,7 @@ export type ProjectSettings = {
   end_date: string;
   total_progress: number;
   budget_baht: number | null;
+  budget_source: string | null;
   updated_at: string;
   hero_image_path?: string | null;
   hero_url?: string | null;

@@ -136,7 +136,15 @@ export function EventDialog({
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">— ไม่ระบุ —</SelectItem>
-                  {phases.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  {[...phases]
+                    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+                    .map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        <div className="max-w-[200px] sm:max-w-[300px] truncate" title={p.name}>
+                          {p.name}
+                        </div>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

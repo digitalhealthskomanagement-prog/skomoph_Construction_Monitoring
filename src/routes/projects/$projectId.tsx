@@ -13,7 +13,7 @@ import { SCurve } from "@/components/s-curve";
 import { useAuthStatus } from "@/hooks/use-auth-status";
 import { projectQuery, type ProjectSettings, type ResourceLink } from "@/lib/project-query";
 import { formatThaiDate, toBE } from "@/lib/thai-date";
-import { Building2, CalendarDays, ImagePlus, PencilLine, Settings2, Sparkles, Users } from "lucide-react";
+import { Building2, CalendarDays, ImagePlus, PencilLine, Settings2, Sparkles, Users, Wallet } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import buildingHero from "@/assets/building-hero.png.asset.json";
@@ -131,6 +131,7 @@ function Home() {
               <div className="mt-4 flex flex-wrap gap-2">
                 {startBE && <StatChip icon={<CalendarDays className="size-4" />} label={`${startBE} — ${endBE}`} />}
                 {settings?.subtitle && <StatChip icon={<Building2 className="size-4" />} label={settings.subtitle} />}
+                {settings?.budget_source && <StatChip icon={<Wallet className="size-4" />} label={settings.budget_source} />}
                 <StatChip icon={<Users className="size-4" />} label="ทีมงานอัปเดตร่วมกัน" />
               </div>
               {editable ? (
