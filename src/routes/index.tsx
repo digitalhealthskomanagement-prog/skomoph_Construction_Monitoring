@@ -174,7 +174,7 @@ function DashboardComponent() {
                 >
                   <div className="aspect-[4/3] bg-neutral-100 relative overflow-hidden">
                     <img 
-                      src={project.hero_url || buildingHero.url} 
+                      src={project.hero_url || "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?auto=format&fit=crop&w=1600&q=80"} 
                       alt={project.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />

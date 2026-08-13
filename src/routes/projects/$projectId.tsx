@@ -18,7 +18,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import buildingHero from "@/assets/building-hero.png.asset.json";
 
-const FALLBACK_HERO = buildingHero.url;
+const FALLBACK_HERO = "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?auto=format&fit=crop&w=1600&q=80";
 
 export const Route = createFileRoute("/projects/$projectId")({
   loader: async ({ context, params }) => {

@@ -102,6 +102,13 @@ export const getProjectData = createServerFn({ method: "GET" })
     sb.from("risks").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
     sb.from("resource_links").select("*").order("order", { ascending: true }), 
   ]);
+
+  if (settings.error) throw settings.error;
+  if (phases.error) throw phases.error;
+  if (events.error) throw events.error;
+  if (updatesRaw.error) throw updatesRaw.error;
+  if (risks.error) throw risks.error;
+  if (resources.error) throw resources.error;
   const updates = await Promise.all(
     (updatesRaw.data ?? []).map(async (u) => {
       const images = await signImages(u.image_urls, u.image_url);
