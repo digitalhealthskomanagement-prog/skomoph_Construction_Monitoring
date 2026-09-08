@@ -23,9 +23,11 @@ const customIcon = new L.Icon({
 });
 
 export function ProjectMap({ projects }: { projects: any[] }) {
+  const [mounted, setMounted] = useState(false);
   const [geoData, setGeoData] = useState<any>(null);
 
   useEffect(() => {
+    setMounted(true);
     // Fetch Sa Kaeo province boundaries (code 27)
     fetch("https://opendata-service.moph.go.th/gis/v1/geojson/2/27/")
       .then((res) => res.json())
@@ -42,11 +44,12 @@ export function ProjectMap({ projects }: { projects: any[] }) {
         </h3>
       </div>
       <div className="flex-1">
-        <MapContainer
-          center={[13.824, 102.065]} // approximate center of Sa Kaeo
-          zoom={9}
-          style={{ height: "100%", width: "100%" }}
-        >
+        {mounted ? (
+          <MapContainer
+            center={[13.824, 102.065]} // approximate center of Sa Kaeo
+            zoom={9}
+            style={{ height: "100%", width: "100%" }}
+          >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -106,7 +109,12 @@ export function ProjectMap({ projects }: { projects: any[] }) {
                 </Popup>
               </Marker>
             ))}
-        </MapContainer>
+          </MapContainer>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-neutral-50/50 text-neutral-400 text-sm">
+            กำลังโหลดแผนที่...
+          </div>
+        )}
       </div>
     </div>
   );
