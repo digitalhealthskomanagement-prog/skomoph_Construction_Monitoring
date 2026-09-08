@@ -55,38 +55,55 @@ async function signImages(paths: string[] | null | undefined, fallback: string |
 // ---------- Public reads ----------
 
 export const getAllProjectsData = createServerFn({ method: "GET" }).handler(async () => {
-  const sb = await admin();
-  const { data, error } = await sb.from("projects").select("*, units(*)").order("updated_at", { ascending: false });
-  if (error) console.error("getAllProjectsData error:", error);
-  
-  const projects = data ?? [];
-  return Promise.all(projects.map(async (d: any) => {
-    let heroUrl = await signImage(d.hero_image_path ?? null);
-    if (!heroUrl) {
-      const { data: latestUpdate } = await sb.from("updates").select("image_url, image_urls").eq("project_id", d.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
-      if (latestUpdate) {
-        const signed = await signImages(latestUpdate.image_urls, latestUpdate.image_url);
-        heroUrl = signed[0] ?? null;
-      }
+  try {
+    const sb = await admin();
+    const { data, error } = await sb.from("projects").select("*, units(*)").order("updated_at", { ascending: false });
+    if (error) {
+      console.error("getAllProjectsData error:", error);
+      return [];
     }
-    return {
-      ...d,
-      hero_url: heroUrl,
-      unit_name: d.units?.name,
-      unit_type: d.units?.type,
-      district: d.units?.district,
-      province: d.units?.province,
-      lat: d.units?.lat,
-      lng: d.units?.lng,
-      units: undefined
-    };
-  }));
+    
+    const projects = data ?? [];
+    return Promise.all(projects.map(async (d: any) => {
+      let heroUrl = await signImage(d.hero_image_path ?? null);
+      if (!heroUrl) {
+        const { data: latestUpdate } = await sb.from("updates").select("image_url, image_urls").eq("project_id", d.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+        if (latestUpdate) {
+          const signed = await signImages(latestUpdate.image_urls, latestUpdate.image_url);
+          heroUrl = signed[0] ?? null;
+        }
+      }
+      return {
+        ...d,
+        hero_url: heroUrl,
+        unit_name: d.units?.name,
+        unit_type: d.units?.type,
+        district: d.units?.district,
+        province: d.units?.province,
+        lat: d.units?.lat,
+        lng: d.units?.lng,
+        units: undefined
+      };
+    }));
+  } catch (err) {
+    console.error("Failed to fetch all projects data (Supabase may be paused or offline):", err);
+    return [];
+  }
 });
 
 export const getAllUnitsData = createServerFn({ method: "GET" }).handler(async () => {
-  const sb = await admin();
-  const { data } = await sb.from("units").select("*").order("name", { ascending: true });
-  return data ?? [];
+  try {
+    const sb = await admin();
+    const { data, error } = await sb.from("units").select("*").order("name", { ascending: true });
+    if (error) {
+      console.error("getAllUnitsData error:", error);
+      return [];
+    }
+    return data ?? [];
+  } catch (err) {
+    console.error("Failed to fetch units data (Supabase may be paused or offline):", err);
+    return [];
+  }
 });
 
 export const getProjectData = createServerFn({ method: "GET" })

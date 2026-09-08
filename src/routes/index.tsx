@@ -99,6 +99,17 @@ function DashboardComponent() {
       <SiteHeader />
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+        {activeProjects.length === 0 && (!units || units.length === 0) && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3.5 rounded-xl flex items-start gap-3 text-sm shadow-sm">
+            <span className="text-xl">⚠️</span>
+            <div>
+              <p className="font-semibold text-base">ไม่สามารถเชื่อมต่อฐานข้อมูลได้ในขณะนี้</p>
+              <p className="text-sm text-amber-800 mt-1">
+                ระบบไม่สามารถเชื่อมต่อไปยัง Supabase ได้ (หากเป็นโปรเจกต์ Free Tier อาจถูก Pause ชั่วคราวเนื่องจากไม่ได้ใช้งานเกิน 7 วัน กรุณาเข้าไปที่ Supabase Dashboard แล้วกด <strong>Restore Project</strong>)
+              </p>
+            </div>
+          </div>
+        )}
         
         {/* Dashboard Summary Cards */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
