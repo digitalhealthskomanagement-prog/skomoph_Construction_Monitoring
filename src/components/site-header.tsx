@@ -1,6 +1,6 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { KeyRound, LogOut, Settings2 } from "lucide-react";
+import { KeyRound, LogOut, Settings2, BookOpen } from "lucide-react";
 import hospitalLogo from "@/assets/hospital-logo.png";
 import { Button } from "@/components/ui/button";
 import { AUTH_STATUS_QUERY_KEY, type AuthStatus, useAuthStatus } from "@/hooks/use-auth-status";
@@ -39,6 +39,9 @@ export function SiteHeader() {
         <nav className="flex items-center gap-1 sm:gap-2">
           <Link to="/" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground" activeOptions={{ exact: true }} activeProps={{ className: "text-foreground" }}>
             หน้าแรก
+          </Link>
+          <Link to="/guide" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5" activeProps={{ className: "text-foreground font-semibold" }}>
+            <BookOpen className="size-4" /> คู่มือการใช้งาน
           </Link>
           {unlocked ? (
             <div className="ml-2 flex items-center gap-2">

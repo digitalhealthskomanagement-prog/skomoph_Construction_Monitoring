@@ -1,9 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { allProjectsQuery } from "@/lib/project-query";
 import { useSuspenseQuery, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { ProvinceStats, ProvinceCharts, UnitCardGrid } from "@/components/province";
+import { Button } from "@/components/ui/button";
+import { BookOpen } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   loader: async ({ context }) => {
@@ -113,6 +115,26 @@ function DashboardComponent() {
             </div>
           </div>
         )}
+
+        {/* Welcome & Manual Banner */}
+        <div className="rounded-2xl border border-brand/20 bg-linear-to-r from-brand/10 via-brand/5 to-transparent p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-1">
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand">
+              <BookOpen className="size-3.5" /> ระบบติดตามงานก่อสร้าง 127 หน่วยงาน จ.สระแก้ว
+            </span>
+            <h2 className="text-lg sm:text-xl font-bold text-neutral-900">
+              คู่มือการใช้งานระบบและการบันทึกข้อมูล
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-600 max-w-xl">
+              ขั้นตอนการลงทะเบียนสำหรับหน่วยงาน, การแบ่งงวดงาน S-Curve, การลงปฏิทินงานก่อสร้าง และการอัปโหลดภาพรายงานหน้างาน
+            </p>
+          </div>
+          <Link to="/guide" className="shrink-0">
+            <Button className="bg-brand text-brand-foreground hover:bg-brand/90 gap-2 shadow-sm">
+              <BookOpen className="size-4" /> ดูคู่มือการใช้งาน &rarr;
+            </Button>
+          </Link>
+        </div>
 
         {/* 1. Dashboard Summary Cards */}
         <ProvinceStats
