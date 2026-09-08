@@ -9,14 +9,23 @@ import { BookOpen } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   loader: async ({ context }) => {
-    await context.queryClient.ensureQueryData(allProjectsQuery);
+    await Promise.allSettled([
+      context.queryClient.ensureQueryData(allProjectsQuery),
+      context.queryClient.ensureQueryData({
+        queryKey: ["units"],
+        queryFn: async () => {
+          const { getAllUnitsData } = await import("@/lib/data.functions");
+          return getAllUnitsData();
+        },
+      }),
+    ]);
   },
   component: DashboardComponent,
 });
 
 function DashboardComponent() {
-  const { data: allProjects } = useSuspenseQuery(allProjectsQuery);
-  const { data: units } = useQuery({
+  const { data: allProjects = [] } = useSuspenseQuery(allProjectsQuery);
+  const { data: units, isLoading: isUnitsLoading, isError: isUnitsError } = useQuery({
     queryKey: ["units"],
     queryFn: async () => {
       const { getAllUnitsData } = await import("@/lib/data.functions");
@@ -104,7 +113,8 @@ function DashboardComponent() {
       <SiteHeader />
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-        {activeProjects.length === 0 && (!units || units.length === 0) && (
+        {/* Only show outage warning on genuine query error after loading finishes */}
+        {!isUnitsLoading && isUnitsError && (
           <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3.5 rounded-xl flex items-start gap-3 text-sm shadow-sm">
             <span className="text-xl">⚠️</span>
             <div>
