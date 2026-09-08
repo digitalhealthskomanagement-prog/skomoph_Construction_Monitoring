@@ -2,14 +2,18 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { SiteHeader } from "@/components/site-header";
-import { ProgressDonut } from "@/components/progress-donut";
-import { PhaseList } from "@/components/phase-list";
-import { CalendarGrid, type CalEvent } from "@/components/calendar-grid";
-import { EventDialog } from "@/components/event-dialog";
-import { UpdatesList, UpdateComposer } from "@/components/updates";
-import { TeamResources } from "@/components/team-resources";
-import { CategoryProgress } from "@/components/category-progress";
-import { SCurve } from "@/components/s-curve";
+import {
+  ProgressDonut,
+  PhaseList,
+  CalendarGrid,
+  type CalEvent,
+  EventDialog,
+  UpdatesList,
+  UpdateComposer,
+  TeamResources,
+  CategoryProgress,
+  SCurve,
+} from "@/components/project";
 import { useAuthStatus } from "@/hooks/use-auth-status";
 import { projectQuery, type ProjectSettings, type ResourceLink } from "@/lib/project-query";
 import { formatThaiDate, toBE } from "@/lib/thai-date";

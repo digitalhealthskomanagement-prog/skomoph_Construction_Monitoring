@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { formatThaiDate } from "@/lib/thai-date";
 import { CalendarDays, ClipboardList, HardHat, AlertTriangle } from "lucide-react";
-import { RiskDialog, type Risk } from "@/components/risk-dialog";
+import { RiskDialog, type Risk } from "./risk-dialog";
 import { planPctForPhaseNow } from "@/lib/s-curve";
 
 type Phase = {
