@@ -59,6 +59,40 @@ export const setSessionCookie = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+export const assignRegisteredUserRole = createServerFn({ method: "POST" })
+  .inputValidator(z.object({
+    userId: z.string(),
+    unitId: z.string(),
+  }))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    
+    const { data: unit } = await supabaseAdmin
+      .from("units")
+      .select("type, name")
+      .eq("id", data.unitId)
+      .maybeSingle();
+
+    const isSsj = unit?.type === "สสจ." || unit?.name?.includes("สสจ");
+    const role = isSsj ? "super_admin" : "unit_admin";
+
+    // Upsert user role using admin client
+    const { error: roleError } = await supabaseAdmin
+      .from("user_roles")
+      .upsert({
+        user_id: data.userId,
+        unit_id: data.unitId,
+        role: role,
+      });
+
+    if (roleError) {
+      console.error("assignRegisteredUserRole error:", roleError);
+      return { ok: false as const, error: roleError.message };
+    }
+
+    return { ok: true as const, role, isSsj };
+  });
+
 export const clearSessionCookie = createServerFn({ method: "POST" }).handler(async () => {
   const { getSession } = await import("./auth.server");
   const session = await getSession();
