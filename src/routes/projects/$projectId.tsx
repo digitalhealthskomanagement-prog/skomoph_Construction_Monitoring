@@ -20,15 +20,16 @@ import { formatThaiDate, toBE } from "@/lib/thai-date";
 import { Building2, CalendarDays, ImagePlus, PencilLine, Settings2, Sparkles, Users, Wallet } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import buildingHero from "@/assets/building-hero.png.asset.json";
 
 const FALLBACK_HERO = "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?auto=format&fit=crop&w=1600&q=80";
 
 export const Route = createFileRoute("/projects/$projectId")({
   loader: async ({ context, params }) => {
-    const query = projectQuery(params.projectId);
-    await context.queryClient.ensureQueryData(query);
-    return { query };
+    try {
+      await context.queryClient.ensureQueryData(projectQuery(params.projectId));
+    } catch (err) {
+      console.error("Error prefetching project data in loader:", err);
+    }
   },
   head: () => ({
     meta: [
@@ -44,31 +45,53 @@ export const Route = createFileRoute("/projects/$projectId")({
 });
 
 function Home() {
-  const { query } = Route.useLoaderData();
-  const { data } = useSuspenseQuery(query);
-  const { data: auth } = useAuthStatus();
   const params = Route.useParams();
+  const { data } = useSuspenseQuery(projectQuery(params.projectId));
+  const { data: auth } = useAuthStatus();
   const editable = !!auth?.unlocked;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogEvent, setDialogEvent] = useState<CalEvent | null>(null);
   const [dialogDate, setDialogDate] = useState<Date | null>(null);
   const [showAllUpdates, setShowAllUpdates] = useState(false);
 
-  const settings = data.settings as ProjectSettings | null;
-  const resources = (data.resources ?? []) as ResourceLink[];
-  const totalProgress = Number(settings?.total_progress ?? 0);
-  const startBE = settings ? toBE(new Date(settings.start_date).getFullYear()) : "";
-  const endBE = settings ? toBE(new Date(settings.end_date).getFullYear()) : "";
-  const heroUrl = settings?.hero_url ?? FALLBACK_HERO;
+  const settings = data?.settings as ProjectSettings | null;
+  const resources = (data?.resources ?? []) as ResourceLink[];
+
+  if (!settings) {
+    return (
+      <div className="min-h-screen bg-background">
+        <SiteHeader />
+        <main className="mx-auto max-w-2xl px-4 py-20 text-center">
+          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+            <Building2 className="size-8" />
+          </div>
+          <h1 className="font-display text-2xl font-bold text-foreground">ไม่พบข้อมูลโครงการ</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            โครงการนี้อาจยังไม่ได้ถูกสร้าง หรือถูกลบออกจากระบบแล้ว
+          </p>
+          <div className="mt-6 flex justify-center gap-3">
+            <Link to="/">
+              <Button>กลับสู่หน้าหลัก</Button>
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const totalProgress = Number(settings.total_progress ?? 0);
+  const startBE = settings.start_date ? toBE(new Date(settings.start_date).getFullYear()) : "";
+  const endBE = settings.end_date ? toBE(new Date(settings.end_date).getFullYear()) : "";
+  const heroUrl = settings.hero_url ?? FALLBACK_HERO;
 
   const headings = {
-    prepHeading: settings?.prep_heading ?? "ขั้นเตรียมการ",
-    prepSubtitle: settings?.prep_subtitle ?? "",
-    consHeading: settings?.cons_heading ?? "การก่อสร้าง",
-    consSubtitle: settings?.cons_subtitle ?? "",
+    prepHeading: settings.prep_heading ?? "ขั้นเตรียมการ",
+    prepSubtitle: settings.prep_subtitle ?? "",
+    consHeading: settings.cons_heading ?? "การก่อสร้าง",
+    consSubtitle: settings.cons_subtitle ?? "",
   };
 
-  const calendarStart = settings?.calendar_start_month
+  const calendarStart = settings.calendar_start_month
     ? new Date(settings.calendar_start_month + "T00:00:00")
     : undefined;
 

@@ -109,60 +109,73 @@ export const getAllUnitsData = createServerFn({ method: "GET" }).handler(async (
 export const getProjectData = createServerFn({ method: "GET" })
   .inputValidator((d: { projectId: string }) => d)
   .handler(async ({ data }) => {
-  const sb = await admin();
-  const projectId = data.projectId;
-  const [settings, phases, events, updatesRaw, risks, resources] = await Promise.all([
-    sb.from("projects").select("*, units(*)").eq("id", projectId).maybeSingle(),
-    sb.from("phases").select("*").eq("project_id", projectId).order("order", { ascending: true }),
-    sb.from("calendar_events").select("*").eq("project_id", projectId).order("start_date", { ascending: true }),
-    sb.from("updates").select("*").eq("project_id", projectId).order("created_at", { ascending: false }).limit(50),
-    sb.from("risks").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
-    sb.from("resource_links").select("*").order("order", { ascending: true }), 
-  ]);
+    try {
+      const sb = await admin();
+      const projectId = data.projectId;
+      const [settings, phases, events, updatesRaw, risks, resources] = await Promise.all([
+        sb.from("projects").select("*, units(*)").eq("id", projectId).maybeSingle(),
+        sb.from("phases").select("*").eq("project_id", projectId).order("order", { ascending: true }),
+        sb.from("calendar_events").select("*").eq("project_id", projectId).order("start_date", { ascending: true }),
+        sb.from("updates").select("*").eq("project_id", projectId).order("created_at", { ascending: false }).limit(50),
+        sb.from("risks").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
+        sb.from("resource_links").select("*").order("order", { ascending: true }), 
+      ]);
 
-  if (settings.error) throw settings.error;
-  if (phases.error) throw phases.error;
-  if (events.error) throw events.error;
-  if (updatesRaw.error) throw updatesRaw.error;
-  if (risks.error) throw risks.error;
-  if (resources.error) throw resources.error;
-  const updates = await Promise.all(
-    (updatesRaw.data ?? []).map(async (u) => {
-      const images = await signImages(u.image_urls, u.image_url);
-      const thumbs = await signImages((u as { thumb_urls?: string[] }).thumb_urls, null);
-      return { ...u, image_url: images[0] ?? null, image_urls: images, thumb_urls: thumbs };
-    }),
-  );
-  let s: any = settings.data;
-  if (s) {
-    s = {
-      ...s,
-      unit_name: s.units?.name,
-      unit_type: s.units?.type,
-      district: s.units?.district,
-      province: s.units?.province,
-      lat: s.units?.lat,
-      lng: s.units?.lng,
-      units: undefined
-    };
-  }
-  let heroUrl = await signImage((s as { hero_image_path?: string | null } | null)?.hero_image_path ?? null);
-  if (!heroUrl && updates && updates.length > 0) {
-    // Look for the latest update that has a signed image
-    const latestWithImage = updates.find(u => u.image_url || (u.image_urls && u.image_urls.length > 0));
-    if (latestWithImage) {
-      heroUrl = latestWithImage.image_url || latestWithImage.image_urls?.[0] || null;
+      if (settings.error) console.error("getProjectData settings error:", settings.error);
+      if (phases.error) console.error("getProjectData phases error:", phases.error);
+      if (events.error) console.error("getProjectData events error:", events.error);
+      if (updatesRaw.error) console.error("getProjectData updatesRaw error:", updatesRaw.error);
+      if (risks.error) console.error("getProjectData risks error:", risks.error);
+      if (resources.error) console.error("getProjectData resources error:", resources.error);
+
+      const updates = await Promise.all(
+        (updatesRaw.data ?? []).map(async (u) => {
+          const images = await signImages(u.image_urls, u.image_url);
+          const thumbs = await signImages((u as { thumb_urls?: string[] }).thumb_urls, null);
+          return { ...u, image_url: images[0] ?? null, image_urls: images, thumb_urls: thumbs };
+        }),
+      );
+      let s: any = settings.data;
+      if (s) {
+        s = {
+          ...s,
+          unit_name: s.units?.name,
+          unit_type: s.units?.type,
+          district: s.units?.district,
+          province: s.units?.province,
+          lat: s.units?.lat,
+          lng: s.units?.lng,
+          units: undefined
+        };
+      }
+      let heroUrl = await signImage((s as { hero_image_path?: string | null } | null)?.hero_image_path ?? null);
+      if (!heroUrl && updates && updates.length > 0) {
+        // Look for the latest update that has a signed image
+        const latestWithImage = updates.find(u => u.image_url || (u.image_urls && u.image_urls.length > 0));
+        if (latestWithImage) {
+          heroUrl = latestWithImage.image_url || latestWithImage.image_urls?.[0] || null;
+        }
+      }
+      return {
+        settings: s ? { ...s, hero_url: heroUrl } : null,
+        phases: phases.data ?? [],
+        events: events.data ?? [],
+        updates,
+        risks: risks.data ?? [],
+        resources: resources.data ?? [],
+      };
+    } catch (err) {
+      console.error("Failed to fetch project data (Supabase may be paused or offline):", err);
+      return {
+        settings: null,
+        phases: [],
+        events: [],
+        updates: [],
+        risks: [],
+        resources: [],
+      };
     }
-  }
-  return {
-    settings: s ? { ...s, hero_url: heroUrl } : null,
-    phases: phases.data ?? [],
-    events: events.data ?? [],
-    updates,
-    risks: risks.data ?? [],
-    resources: resources.data ?? [],
-  };
-});
+  });
 
 
 // ---------- Mutations (gated) ----------
