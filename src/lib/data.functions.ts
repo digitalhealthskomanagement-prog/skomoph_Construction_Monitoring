@@ -338,6 +338,11 @@ export const postUpdate = createServerFn({ method: "POST" })
       const { data: p } = await sb.from("phases").select("project_id").eq("id", data.phase_id).single();
       projectId = p?.project_id;
     }
+    let snapshot = data.progress_snapshot;
+    if (snapshot == null && projectId) {
+      const { data: proj } = await sb.from("projects").select("total_progress").eq("id", projectId).maybeSingle();
+      snapshot = proj?.total_progress ?? null;
+    }
     const paths = (data.image_paths ?? (data.image_path ? [data.image_path] : [])).slice(0, 4);
     const { error } = await sb.from("updates").insert({
       title: data.title,
@@ -345,7 +350,7 @@ export const postUpdate = createServerFn({ method: "POST" })
       reporter_name: data.reporter_name ?? null,
       phase_id: data.phase_id ?? null,
       project_id: projectId,
-      progress_snapshot: data.progress_snapshot ?? null,
+      progress_snapshot: snapshot,
       image_url: paths[0] ?? null,
       image_urls: paths,
       thumb_urls: (data.thumb_paths ?? []).slice(0, 4),

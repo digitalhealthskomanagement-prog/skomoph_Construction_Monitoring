@@ -86,6 +86,30 @@ export function buildSCurve(
     allStarts.push(r.start);
     allEnds.push(r.end);
   }
+
+  // Earliest construction start (to position preparation phases if they lack calendar events)
+  const consStarts: number[] = [];
+  for (const p of cons) {
+    const r = rangeByPhase.get(p.id);
+    if (r) consStarts.push(r.start);
+  }
+  const earliestCons = consStarts.length ? Math.min(...consStarts) : (allStarts.length ? Math.min(...allStarts) : Date.now());
+
+  // If preparation phases have no calendar events, synthesize their timeframe before construction starts
+  const prepWithoutEvents = prep.filter((p) => !rangeByPhase.has(p.id));
+  if (prepWithoutEvents.length > 0) {
+    const prepStart = opts?.from ? opts.from.getTime() : earliestCons - 90 * 24 * 3600 * 1000;
+    const prepDuration = Math.max(14 * 24 * 3600 * 1000, earliestCons - prepStart);
+    const step = prepDuration / prepWithoutEvents.length;
+    prepWithoutEvents.forEach((p, idx) => {
+      const pStart = prepStart + idx * step;
+      const pEnd = pStart + step;
+      rangeByPhase.set(p.id, { start: pStart, end: pEnd });
+      allStarts.push(pStart);
+      allEnds.push(pEnd);
+    });
+  }
+
   const from = opts?.from ?? (allStarts.length ? new Date(Math.min(...allStarts)) : new Date());
   const to = opts?.to ?? (allEnds.length ? new Date(Math.max(...allEnds)) : new Date());
 
@@ -118,13 +142,40 @@ export function buildSCurve(
 
   function actualAt(ts: number, nowTs: number): number | null {
     if (ts > nowTs) return null;
-    let v = 0;
-    for (const s of snaps) {
-      if (s.ts <= ts) v = s.v;
-      else break;
+    if (snaps.length > 0) {
+      let v = 0;
+      for (const s of snaps) {
+        if (s.ts <= ts) v = s.v;
+        else break;
+      }
+      return v;
     }
-    // Anchor: if this is the last past week, use overallCurrent
-    return v;
+
+    // Fallback if no historical update snapshots: estimate from completed phases by date `ts`
+    let prepActual = 0;
+    for (const p of prep) {
+      const r = rangeByPhase.get(p.id);
+      if (!r) continue;
+      const progress = Number(p.progress ?? 0);
+      if (progress > 0) {
+        const pct = phasePctPlanAt(ts, r.start, r.end);
+        prepActual += ((pct * (progress / 100)) / 100) * prepShare;
+      }
+    }
+    let consActual = 0;
+    if (consWeightTotal > 0) {
+      for (const p of cons) {
+        const r = rangeByPhase.get(p.id);
+        if (!r) continue;
+        const progress = Number(p.progress ?? 0);
+        if (progress > 0) {
+          const pct = phasePctPlanAt(ts, r.start, r.end);
+          const share = (Number(p.weight ?? 0) / consWeightTotal) * 50;
+          consActual += ((pct * (progress / 100)) / 100) * share;
+        }
+      }
+    }
+    return Math.min(overallCurrent, Math.max(0, prepActual + consActual));
   }
 
   const points: SCurvePoint[] = [];

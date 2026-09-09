@@ -66,8 +66,8 @@ export function SCurve({
 
       <div className="h-64 w-full sm:h-72">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={points} margin={{ top: 8, right: 12, left: -12, bottom: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+          <LineChart data={points} margin={{ top: 12, right: 16, left: 4, bottom: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
             <XAxis
               dataKey="weekTs"
               type="number"
@@ -77,27 +77,60 @@ export function SCurve({
                 const d = new Date(v);
                 return `${THAI_MON[d.getUTCMonth()]} ${String(toBE(d.getUTCFullYear())).slice(-2)}`;
               }}
-              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+              tick={{ fontSize: 11, fill: "#64748b" }}
               minTickGap={40}
             />
             <YAxis
               domain={[0, 100]}
               tickFormatter={(v) => `${v}%`}
-              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-              width={44}
+              tick={{ fontSize: 11, fill: "#64748b" }}
+              width={46}
             />
             <Tooltip
-              contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
+              contentStyle={{
+                backgroundColor: "#ffffff",
+                border: "1px solid #e2e8f0",
+                borderRadius: 12,
+                boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                fontSize: 12,
+                color: "#0f172a",
+              }}
               labelFormatter={(v: number) => {
                 const d = new Date(v);
                 return `สัปดาห์ ${d.getUTCDate()} ${THAI_MON[d.getUTCMonth()]} ${toBE(d.getUTCFullYear())}`;
               }}
               formatter={(val: any, name: string) => [val == null ? "—" : `${Number(val).toFixed(1)}%`, name]}
             />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            <ReferenceLine x={nowTs} stroke="hsl(var(--brand))" strokeDasharray="4 4" label={{ value: "วันนี้", position: "top", fill: "hsl(var(--brand))", fontSize: 11 }} />
-            <Line type="monotone" dataKey="plan" name="แผน" stroke="hsl(var(--muted-foreground))" strokeWidth={2} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
-            <Line type="monotone" dataKey="actual" name="ผลจริง" stroke="hsl(var(--brand))" strokeWidth={2.5} dot={false} connectNulls isAnimationActive={false} />
+            <Legend wrapperStyle={{ fontSize: 12, paddingTop: 6 }} />
+            <ReferenceLine
+              x={nowTs}
+              stroke="#0f766e"
+              strokeDasharray="4 4"
+              strokeWidth={1.5}
+              label={{ value: "วันนี้", position: "insideTopRight", fill: "#0f766e", fontSize: 11, fontWeight: 600 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="plan"
+              name="แผน"
+              stroke="#94a3b8"
+              strokeWidth={2.5}
+              strokeDasharray="6 4"
+              dot={false}
+              activeDot={{ r: 5, fill: "#94a3b8" }}
+              isAnimationActive={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="actual"
+              name="ผลจริง"
+              stroke="#0d9488"
+              strokeWidth={3}
+              dot={{ r: 2.5, fill: "#0d9488", strokeWidth: 0 }}
+              activeDot={{ r: 6, fill: "#0d9488" }}
+              connectNulls
+              isAnimationActive={false}
+            />
           </LineChart>
         </ResponsiveContainer>
       </div>
