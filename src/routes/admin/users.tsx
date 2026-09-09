@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { getAllUsers, updateUserRole, approveUser, deleteUser } from "@/lib/admin.functions";
 import { getAllUnitsData } from "@/lib/data.functions";
 import {
@@ -29,6 +30,10 @@ function AdminUsersPage() {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
+  const approveUserFn = useServerFn(approveUser);
+  const updateUserRoleFn = useServerFn(updateUserRole);
+  const deleteUserFn = useServerFn(deleteUser);
+
   const { data: usersData, isLoading: isLoadingUsers } = useQuery({
     queryKey: ["admin_users"],
     queryFn: () => getAllUsers(),
@@ -40,36 +45,39 @@ function AdminUsersPage() {
   });
 
   const approveMutation = useMutation({
-    mutationFn: approveUser,
+    mutationFn: (vars: { userId: string; role: "super_admin" | "unit_admin"; unitId?: string | null }) =>
+      approveUserFn({ data: vars }),
     onSuccess: () => {
       toast.success("อนุมัติสิทธิ์ผู้ใช้งานสำเร็จ");
       queryClient.invalidateQueries({ queryKey: ["admin_users"] });
     },
-    onError: (err) => {
-      toast.error(`เกิดข้อผิดพลาดในการอนุมัติ: ${err.message}`);
+    onError: (err: any) => {
+      toast.error(`เกิดข้อผิดพลาดในการอนุมัติ: ${err.message || err}`);
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: updateUserRole,
+    mutationFn: (vars: { userId: string; role: "super_admin" | "unit_admin"; unitIds?: string[] }) =>
+      updateUserRoleFn({ data: vars }),
     onSuccess: () => {
       toast.success("อัปเดตข้อมูลผู้ใช้สำเร็จ");
       queryClient.invalidateQueries({ queryKey: ["admin_users"] });
       setIsEditDialogOpen(false);
     },
-    onError: (err) => {
-      toast.error(`เกิดข้อผิดพลาด: ${err.message}`);
+    onError: (err: any) => {
+      toast.error(`เกิดข้อผิดพลาด: ${err.message || err}`);
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: deleteUser,
+    mutationFn: (vars: { userId: string }) =>
+      deleteUserFn({ data: vars }),
     onSuccess: () => {
       toast.success("ลบผู้ใช้งานสำเร็จ");
       queryClient.invalidateQueries({ queryKey: ["admin_users"] });
     },
-    onError: (err) => {
-      toast.error(`เกิดข้อผิดพลาดในการลบ: ${err.message}`);
+    onError: (err: any) => {
+      toast.error(`เกิดข้อผิดพลาดในการลบ: ${err.message || err}`);
     },
   });
 
