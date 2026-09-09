@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getAllUsers, updateUserRole, deleteUser } from "@/lib/admin.functions";
+import { getAllUsers, updateUserRole, approveUser, deleteUser } from "@/lib/admin.functions";
 import { getAllUnitsData } from "@/lib/data.functions";
 import {
   Table,
@@ -18,6 +18,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { ShieldCheck, UserCheck, Clock, UserX } from "lucide-react";
 
 export const Route = createFileRoute("/admin/users")({
   component: AdminUsersPage,
@@ -36,6 +37,17 @@ function AdminUsersPage() {
   const { data: unitsData } = useQuery({
     queryKey: ["units"],
     queryFn: () => getAllUnitsData(),
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: approveUser,
+    onSuccess: () => {
+      toast.success("อนุมัติสิทธิ์ผู้ใช้งานสำเร็จ");
+      queryClient.invalidateQueries({ queryKey: ["admin_users"] });
+    },
+    onError: (err) => {
+      toast.error(`เกิดข้อผิดพลาดในการอนุมัติ: ${err.message}`);
+    },
   });
 
   const updateMutation = useMutation({
@@ -61,6 +73,16 @@ function AdminUsersPage() {
     },
   });
 
+  const handleApprove = (user: any) => {
+    const roleToAssign = user.requested_role === "super_admin" ? "super_admin" : "unit_admin";
+    const unitId = user.unit_ids?.[0] || null;
+    approveMutation.mutate({
+      userId: user.id,
+      role: roleToAssign,
+      unitId: unitId,
+    });
+  };
+
   const handleDelete = (userId: string) => {
     if (confirm("คุณแน่ใจหรือไม่ว่าต้องการลบผู้ใช้งานนี้? การกระทำนี้ไม่สามารถยกเลิกได้")) {
       deleteMutation.mutate({ userId });
@@ -74,61 +96,98 @@ function AdminUsersPage() {
 
   if (isLoadingUsers) return <div className="p-8 text-center">กำลังโหลดข้อมูลผู้ใช้...</div>;
 
+  const pendingCount = usersData?.users.filter(u => !u.is_approved).length || 0;
+
   return (
     <div className="container mx-auto max-w-6xl p-6">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">จัดการผู้ใช้งาน (User Management)</h1>
-          <p className="text-muted-foreground mt-2">ดูแลสิทธิ์และหน่วยบริการของเจ้าหน้าที่ทั้งหมดในระบบ</p>
+          <p className="text-muted-foreground mt-1">ดูแลการอนุมัติสิทธิ์และหน่วยบริการของเจ้าหน้าที่ทั้งหมดในระบบ</p>
         </div>
+        {pendingCount > 0 && (
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-xs font-semibold">
+            <Clock className="size-4 text-amber-600 animate-pulse" />
+            <span>มีผู้ใช้รอการอนุมัติ {pendingCount} รายการ</span>
+          </div>
+        )}
       </div>
 
-      <div className="rounded-md border bg-card">
+      <div className="rounded-md border bg-card shadow-xs overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>อีเมล</TableHead>
-              <TableHead>ระดับสิทธิ์</TableHead>
-              <TableHead>หน่วยบริการที่ดูแล</TableHead>
+              <TableHead>สถานะ / ระดับสิทธิ์</TableHead>
+              <TableHead>หน่วยบริการที่สังกัด</TableHead>
               <TableHead>วันที่สมัคร</TableHead>
-              <TableHead className="text-right">จัดการ</TableHead>
+              <TableHead className="text-right">การจัดการ</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {usersData?.users.map((user) => {
               const assignedUnits = unitsData?.filter(u => user.unit_ids?.includes(u.id)) || [];
+              const isPending = !user.is_approved;
+
               return (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.email}</TableCell>
+                <TableRow key={user.id} className={isPending ? "bg-amber-50/50 hover:bg-amber-50" : undefined}>
+                  <TableCell className="font-medium">
+                    <div>{user.email}</div>
+                    {isPending && (
+                      <span className="text-[11px] text-amber-700 font-normal">
+                        ยื่นขอสมัครเมื่อ {new Date(user.created_at).toLocaleDateString("th-TH")}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>
-                    {user.role === "super_admin" ? (
-                      <Badge variant="default" className="bg-purple-600">Super Admin</Badge>
-                    ) : user.role === "unit_admin" ? (
-                      <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">Unit Admin</Badge>
+                    {user.is_approved ? (
+                      user.role === "super_admin" ? (
+                        <Badge variant="default" className="bg-purple-600">Super Admin</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">Unit Admin</Badge>
+                      )
                     ) : (
-                      <Badge variant="secondary">รอกำหนดสิทธิ์</Badge>
+                      <div className="flex flex-col gap-1 items-start">
+                        <Badge className="bg-amber-100 text-amber-800 border-amber-300 gap-1 font-semibold">
+                          <Clock className="size-3" /> รออนุมัติสิทธิ์
+                        </Badge>
+                        <span className="text-[11px] text-muted-foreground">
+                          ขอสิทธิ์: {user.requested_role === "super_admin" ? "Super Admin (สสจ.)" : "Unit Admin"}
+                        </span>
+                      </div>
                     )}
                   </TableCell>
                   <TableCell>
                     {assignedUnits.length > 0 ? (
-                      <div className="flex flex-wrap gap-1 max-w-[200px]">
+                      <div className="flex flex-wrap gap-1 max-w-[220px]">
                         {assignedUnits.map(u => (
                           <span key={u.id} className="text-xs bg-muted px-2 py-0.5 rounded-full whitespace-nowrap">
-                            {u.name}
+                            {u.name} {u.district ? `(อ.${u.district})` : ""}
                           </span>
                         ))}
                       </div>
-                    ) : <span className="text-muted-foreground">-</span>}
+                    ) : <span className="text-muted-foreground text-xs">-</span>}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
                     {new Date(user.created_at).toLocaleDateString("th-TH")}
                   </TableCell>
-                  <TableCell className="text-right space-x-2">
+                  <TableCell className="text-right space-x-2 whitespace-nowrap">
+                    {isPending && (
+                      <Button
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
+                        disabled={approveMutation.isPending}
+                        onClick={() => handleApprove(user)}
+                      >
+                        <UserCheck className="size-3.5 mr-1" />
+                        อนุมัติสิทธิ์ ({user.requested_role === "super_admin" ? "Super Admin" : "Unit Admin"})
+                      </Button>
+                    )}
                     <Button variant="outline" size="sm" onClick={() => openEditDialog(user)}>
-                      แก้ไขสิทธิ์
+                      {isPending ? "กำหนดสิทธิ์อื่น" : "แก้ไขสิทธิ์"}
                     </Button>
                     <Button variant="destructive" size="sm" onClick={() => handleDelete(user.id)}>
-                      ลบ
+                      {isPending ? "ปฏิเสธ" : "ลบ"}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -151,7 +210,7 @@ function AdminUsersPage() {
           units={unitsData || []} 
           isOpen={isEditDialogOpen} 
           onClose={() => setIsEditDialogOpen(false)} 
-          onSave={(data) => updateMutation.mutate({ userId: selectedUser.id, ...data })}
+          onSave={(data: any) => updateMutation.mutate({ userId: selectedUser.id, ...data })}
           isPending={updateMutation.isPending}
         />
       )}

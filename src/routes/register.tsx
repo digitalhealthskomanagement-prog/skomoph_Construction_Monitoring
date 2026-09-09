@@ -2,7 +2,7 @@ import { createFileRoute, useRouter, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { setSessionCookie, assignRegisteredUserRole } from "@/lib/auth.functions";
+import { setSessionCookie, requestRegistrationApproval } from "@/lib/auth.functions";
 import { AUTH_STATUS_QUERY_KEY, type AuthStatus } from "@/hooks/use-auth-status";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
@@ -36,8 +36,7 @@ export const Route = createFileRoute("/register")({
 function Register() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const setSession = useServerFn(setSessionCookie);
-  const assignRole = useServerFn(assignRegisteredUserRole);
+  const requestApproval = useServerFn(requestRegistrationApproval);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -97,37 +96,23 @@ function Register() {
       }
 
       if (authData.user) {
-        // 2. Safely assign user role via server function
-        const roleRes = await assignRole({
+        // 2. Submit for admin approval
+        await requestApproval({
           data: {
             userId: authData.user.id,
             unitId: unitId,
           },
         });
 
-        if (!roleRes.ok) {
-          toast.error("เกิดข้อผิดพลาดในการตั้งค่าสิทธิ์หน่วยบริการ: " + (roleRes.error || ""));
-          return;
-        }
+        // Sign out Supabase auth session so they don't stay logged in
+        await supabase.auth.signOut();
 
-        toast.success("สมัครสมาชิกสำเร็จ เข้าสู่ระบบเรียบร้อย");
-        
-        if (authData.session) {
-          // Set secure cookie
-          await setSession({ data: { access_token: authData.session.access_token } });
+        toast.success(
+          "ลงทะเบียนเรียบร้อยแล้ว! บัญชีของคุณอยู่ระหว่างรอผู้ดูแลระบบ (สสจ.สระแก้ว) อนุมัติสิทธิ์การใช้งาน",
+          { duration: 8000 }
+        );
 
-          queryClient.setQueryData<AuthStatus>(AUTH_STATUS_QUERY_KEY, (old) => ({
-            ...old,
-            unlocked: true,
-            userId: authData.user?.id,
-            role: roleRes.role,
-            unitId: unitId,
-          }));
-        }
-        
-        await queryClient.invalidateQueries({ queryKey: AUTH_STATUS_QUERY_KEY });
-        await router.invalidate();
-        await router.navigate({ to: "/" });
+        await router.navigate({ to: "/login" });
       }
     } catch (err: any) {
       toast.error("เกิดข้อผิดพลาด: " + (err?.message || "ไม่สามารถลงทะเบียนได้"));

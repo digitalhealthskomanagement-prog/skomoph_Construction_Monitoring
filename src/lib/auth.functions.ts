@@ -36,7 +36,7 @@ export const setSessionCookie = createServerFn({ method: "POST" })
       }
     }
 
-    // Auto-assign admin if missing and email matches
+    // Auto-assign admin if missing and email matches primary root admin
     if (!role && (user.email === "digitalhealthsko.management@gmail.com" || user.email === "admin@skomoph.local")) {
       const { data: newRole } = await supabaseAdmin.from("user_roles").insert({
         user_id: user.id,
@@ -48,6 +48,15 @@ export const setSessionCookie = createServerFn({ method: "POST" })
       }
     }
 
+    // If user has no approved role in user_roles, do NOT unlock session
+    if (!role) {
+      return {
+        ok: false as const,
+        pendingApproval: true as const,
+        error: "บัญชีของคุณอยู่ระหว่างรอผู้ดูแลระบบอนุมัติสิทธิ์การใช้งาน กรุณาติดต่อผู้ดูแลระบบ (สสจ.สระแก้ว)",
+      };
+    }
+
     const session = await getSession();
     await session.update({
       unlocked: true,
@@ -56,10 +65,10 @@ export const setSessionCookie = createServerFn({ method: "POST" })
       unitIds: unitIds,
     });
 
-    return { ok: true as const };
+    return { ok: true as const, role, unitIds };
   });
 
-export const assignRegisteredUserRole = createServerFn({ method: "POST" })
+export const requestRegistrationApproval = createServerFn({ method: "POST" })
   .inputValidator(z.object({
     userId: z.string(),
     unitId: z.string(),
@@ -74,23 +83,32 @@ export const assignRegisteredUserRole = createServerFn({ method: "POST" })
       .maybeSingle();
 
     const isSsj = unit?.type === "สสจ." || unit?.name?.includes("สสจ");
-    const role = isSsj ? "super_admin" : "unit_admin";
+    const requestedRole = isSsj ? "super_admin" : "unit_admin";
 
-    // Upsert user role using admin client
-    const { error: roleError } = await supabaseAdmin
-      .from("user_roles")
-      .upsert({
-        user_id: data.userId,
-        unit_id: data.unitId,
-        role: role,
-      });
+    // Store in user_metadata so admin can see their requested unit and role
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      data.userId,
+      {
+        user_metadata: {
+          unit_id: data.unitId,
+          unit_name: unit?.name || null,
+          requested_role: requestedRole,
+          is_approved: false,
+        },
+      }
+    );
 
-    if (roleError) {
-      console.error("assignRegisteredUserRole error:", roleError);
-      return { ok: false as const, error: roleError.message };
+    if (updateError) {
+      console.error("requestRegistrationApproval update user error:", updateError);
     }
 
-    return { ok: true as const, role, isSsj };
+    // Ensure they do NOT have any active role in user_roles until approved
+    await supabaseAdmin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", data.userId);
+
+    return { ok: true as const, requestedRole, isSsj };
   });
 
 export const clearSessionCookie = createServerFn({ method: "POST" }).handler(async () => {

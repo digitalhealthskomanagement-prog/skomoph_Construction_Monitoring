@@ -47,7 +47,16 @@ function Login() {
 
       if (data.session) {
         // Set secure cookie
-        await setSession({ data: { access_token: data.session.access_token } });
+        const res = await setSession({ data: { access_token: data.session.access_token } });
+
+        if (!res.ok) {
+          // Sign out so they don't remain logged in without an approved role
+          await supabase.auth.signOut();
+          toast.warning(res.error || "บัญชีของคุณอยู่ระหว่างรอผู้ดูแลระบบอนุมัติสิทธิ์การใช้งาน กรุณาติดต่อผู้ดูแลระบบ (สสจ.สระแก้ว)", {
+            duration: 8000,
+          });
+          return;
+        }
 
         // Let the useAuthStatus hook fetch the updated status
         await queryClient.invalidateQueries({ queryKey: AUTH_STATUS_QUERY_KEY });
