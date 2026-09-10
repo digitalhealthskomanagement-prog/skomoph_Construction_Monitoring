@@ -142,16 +142,8 @@ export function buildSCurve(
 
   function actualAt(ts: number, nowTs: number): number | null {
     if (ts > nowTs) return null;
-    if (snaps.length > 0) {
-      let v = 0;
-      for (const s of snaps) {
-        if (s.ts <= ts) v = s.v;
-        else break;
-      }
-      return v;
-    }
 
-    // Fallback if no historical update snapshots: estimate from completed phases by date `ts`
+    // 1. Calculate baseline progress achieved from completed phases up to date `ts`
     let prepActual = 0;
     for (const p of prep) {
       const r = rangeByPhase.get(p.id);
@@ -175,7 +167,23 @@ export function buildSCurve(
         }
       }
     }
-    return Math.min(overallCurrent, Math.max(0, prepActual + consActual));
+    const phaseProgress = Math.min(overallCurrent, Math.max(0, prepActual + consActual));
+
+    // 2. If explicit update snapshots exist, blend them so snapshots take effect without dropping earlier history to 0
+    if (snaps.length > 0) {
+      const earliestSnap = snaps[0];
+      if (ts < earliestSnap.ts) {
+        return phaseProgress;
+      }
+      let snapVal = 0;
+      for (const s of snaps) {
+        if (s.ts <= ts) snapVal = s.v;
+        else break;
+      }
+      return Math.max(phaseProgress, snapVal);
+    }
+
+    return phaseProgress;
   }
 
   const points: SCurvePoint[] = [];
