@@ -1,0 +1,50 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # รันทุกวันจันทร์ พุธ ศุกร์ เวลา 04:00 UTC (11:00 น. ตามเวลาประเทศไทย)
+    - cron: '0 4 * * 1,3,5'
+  workflow_dispatch: # อนุญาตให้กดปุ่ม "Run workflow" ได้เองจากแท็บ Actions บน GitHub
+
+jobs:
+  ping-supabase:
+    name: Ping Database & Website
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase Database
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://fkfusxleqsupnlcxrcnr.supabase.co' }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_ANON_KEY || 'sb_publishable_fTY8fAS9GwiJQfvMTMXBXw_Vz_n8Omm' }}
+        run: |
+          echo "==============================================="
+          echo "Sending keep-alive ping to Supabase Database..."
+          echo "Timestamp: $(date -u)"
+          echo "==============================================="
+          
+          # Ping Supabase Auth Service
+          AUTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: $SUPABASE_KEY" \
+            "$SUPABASE_URL/auth/v1/health")
+
+          echo "Supabase Auth Health HTTP Status: $AUTH_STATUS"
+
+          # Ping Supabase REST API Service
+          REST_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            "$SUPABASE_URL/rest/v1/")
+
+          echo "Supabase REST API HTTP Status: $REST_STATUS"
+
+          if [ "$AUTH_STATUS" -ge 200 ] && [ "$AUTH_STATUS" -lt 400 ]; then
+            echo "✅ Supabase project is ACTIVE and responsive!"
+          else
+            echo "⚠️ Warning: Unexpected Auth HTTP status $AUTH_STATUS"
+          fi
+
+      - name: Ping Production Website on Vercel
+        run: |
+          echo "Pinging Vercel web application..."
+          SITE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://skomoph-construction-monitoring.vercel.app")
+          echo "Website Response HTTP Status: $SITE_STATUS"
+          echo "✅ Keep-alive automation finished successfully."
