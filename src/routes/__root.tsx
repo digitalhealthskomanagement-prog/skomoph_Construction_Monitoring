@@ -112,6 +112,16 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash;
+      const pathname = window.location.pathname;
+      if (hash.includes("access_token=") && pathname !== "/login" && pathname !== "/register") {
+        window.location.replace(`/login${hash}`);
+      }
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
