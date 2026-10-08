@@ -27,7 +27,7 @@ export const setSessionCookie = createServerFn({ method: "POST" })
       .select("role, unit_id")
       .eq("user_id", user.id);
 
-    let role = null;
+    let role: "super_admin" | "unit_admin" | null = null;
     let unitIds: string[] = [];
 
     // Auto-migrate role from existing account with matching email if present
