@@ -1,57 +1,68 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-export const getAllUsers = createServerFn({ method: "GET" })
-  .handler(async () => {
-    const { getAuthContext } = await import("./auth.server");
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    
-    // 1. Check permissions (must be super_admin)
-    const ctx = await getAuthContext();
-    if (!ctx.unlocked || ctx.role !== "super_admin") {
-      throw new Error("Unauthorized");
-    }
+export const getAllUsers = createServerFn({ method: "GET" }).handler(async () => {
+  const { getAuthContext } = await import("./auth.server");
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // 2. Fetch auth users
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.listUsers();
-    if (authError) throw new Error(authError.message);
+  // 1. Check permissions (must be super_admin)
+  const ctx = await getAuthContext();
+  if (!ctx.unlocked || ctx.role !== "super_admin") {
+    throw new Error("Unauthorized");
+  }
 
-    // 3. Fetch user_roles
-    const { data: rolesData, error: rolesError } = await supabaseAdmin
-      .from("user_roles")
-      .select("user_id, role, unit_id");
-    if (rolesError) throw new Error(rolesError.message);
+  // 2. Fetch auth users
+  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.listUsers();
+  if (authError) throw new Error(authError.message);
 
-    // 4. Combine data
-    const users = authData.users.map(u => {
-      const userRoles = rolesData.filter(r => r.user_id === u.id);
-      const isApproved = userRoles.length > 0;
-      const role = userRoles.some(r => r.role === "super_admin") ? "super_admin" : (isApproved ? "unit_admin" : null);
-      const unitIds = isApproved
-        ? (userRoles.map(r => r.unit_id).filter(Boolean) as string[])
-        : ((u.user_metadata?.unit_id ? [u.user_metadata.unit_id] : []) as string[]);
-      const requestedRole = u.user_metadata?.requested_role || (u.user_metadata?.unit_id ? "unit_admin" : null);
+  // 3. Fetch user_roles
+  const { data: rolesData, error: rolesError } = await supabaseAdmin
+    .from("user_roles")
+    .select("user_id, role, unit_id");
+  if (rolesError) throw new Error(rolesError.message);
 
-      return {
-        id: u.id,
-        email: u.email,
-        created_at: u.created_at,
-        is_approved: isApproved,
-        role: role,
-        requested_role: requestedRole,
-        unit_ids: unitIds,
-      };
-    });
+  // 4. Combine data
+  const users = authData.users.map((u) => {
+    const userRoles = rolesData.filter((r) => r.user_id === u.id);
+    const isApproved = userRoles.length > 0;
+    const role = userRoles.some((r) => r.role === "super_admin")
+      ? "super_admin"
+      : isApproved
+        ? "unit_admin"
+        : null;
+    const unitIds = isApproved
+      ? (userRoles.map((r) => r.unit_id).filter(Boolean) as string[])
+      : ((u.user_metadata?.unit_id ? [u.user_metadata.unit_id] : []) as string[]);
+    const requestedRole =
+      u.user_metadata?.requested_role || (u.user_metadata?.unit_id ? "unit_admin" : null);
+    const meta = u.user_metadata || {};
 
-    return { users };
+    return {
+      id: u.id,
+      email: u.email,
+      full_name: meta.full_name || meta.name || "",
+      position: meta.position || "",
+      phone: meta.phone || "",
+      unit_name: meta.unit_name || "",
+      created_at: u.created_at,
+      is_approved: isApproved,
+      role: role,
+      requested_role: requestedRole,
+      unit_ids: unitIds,
+    };
   });
 
+  return { users };
+});
+
 export const approveUser = createServerFn({ method: "POST" })
-  .inputValidator(z.object({
-    userId: z.string(),
-    role: z.enum(["super_admin", "unit_admin"]),
-    unitId: z.string().nullable().optional(),
-  }))
+  .inputValidator(
+    z.object({
+      userId: z.string(),
+      role: z.enum(["super_admin", "unit_admin"]),
+      unitId: z.string().nullable().optional(),
+    }),
+  )
   .handler(async ({ data }) => {
     const { getAuthContext } = await import("./auth.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -63,10 +74,7 @@ export const approveUser = createServerFn({ method: "POST" })
     }
 
     // 2. Delete existing roles if any
-    await supabaseAdmin
-      .from("user_roles")
-      .delete()
-      .eq("user_id", data.userId);
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", data.userId);
 
     // 3. Insert approved role
     if (data.role === "super_admin") {
@@ -88,9 +96,12 @@ export const approveUser = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
     }
 
-    // 4. Update user metadata
+    // 4. Update user metadata preserving existing profile
+    const { data: existingUser } = await supabaseAdmin.auth.admin.getUserById(data.userId);
+    const existingMeta = existingUser?.user?.user_metadata || {};
     await supabaseAdmin.auth.admin.updateUserById(data.userId, {
       user_metadata: {
+        ...existingMeta,
         is_approved: true,
       },
     });
@@ -99,15 +110,17 @@ export const approveUser = createServerFn({ method: "POST" })
   });
 
 export const updateUserRole = createServerFn({ method: "POST" })
-  .inputValidator(z.object({
-    userId: z.string(),
-    role: z.enum(["super_admin", "unit_admin"]),
-    unitIds: z.array(z.string()).default([]),
-  }))
+  .inputValidator(
+    z.object({
+      userId: z.string(),
+      role: z.enum(["super_admin", "unit_admin"]),
+      unitIds: z.array(z.string()).default([]),
+    }),
+  )
   .handler(async ({ data }) => {
     const { getAuthContext } = await import("./auth.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    
+
     // 1. Check permissions
     const ctx = await getAuthContext();
     if (!ctx.unlocked || ctx.role !== "super_admin") {
@@ -115,30 +128,25 @@ export const updateUserRole = createServerFn({ method: "POST" })
     }
 
     // 2. Delete existing roles
-    await supabaseAdmin
-      .from("user_roles")
-      .delete()
-      .eq("user_id", data.userId);
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", data.userId);
 
     // 3. Insert new roles
-     if (data.role === "super_admin") {
+    if (data.role === "super_admin") {
       await supabaseAdmin.from("user_roles").insert({
         user_id: data.userId,
         role: "super_admin",
-        unit_id: null
+        unit_id: null,
       });
     } else {
       if (data.unitIds.length === 0) {
         throw new Error("Unit Admin must have at least one unit assigned");
       }
-      const inserts = data.unitIds.map(uid => ({
+      const inserts = data.unitIds.map((uid) => ({
         user_id: data.userId,
         role: "unit_admin",
-        unit_id: uid
+        unit_id: uid,
       }));
-      const { error } = await supabaseAdmin
-        .from("user_roles")
-        .insert(inserts);
+      const { error } = await supabaseAdmin.from("user_roles").insert(inserts);
       if (error) throw new Error(error.message);
     }
 
@@ -150,7 +158,7 @@ export const deleteUser = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { getAuthContext } = await import("./auth.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    
+
     // 1. Check permissions
     const ctx = await getAuthContext();
     if (!ctx.unlocked || ctx.role !== "super_admin") {
