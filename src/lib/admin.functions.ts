@@ -36,6 +36,9 @@ export const getAllUsers = createServerFn({ method: "GET" }).handler(async () =>
     const requestedRole =
       u.user_metadata?.requested_role || (u.user_metadata?.unit_id ? "unit_admin" : null);
     const meta = u.user_metadata || {};
+    const hasSubmittedRegistration = Boolean(
+      meta.unit_id || meta.requested_role || meta.registration_completed,
+    );
 
     return {
       id: u.id,
@@ -46,6 +49,7 @@ export const getAllUsers = createServerFn({ method: "GET" }).handler(async () =>
       unit_name: meta.unit_name || "",
       created_at: u.created_at,
       is_approved: isApproved,
+      has_submitted_registration: hasSubmittedRegistration,
       role: role,
       requested_role: requestedRole,
       unit_ids: unitIds,
@@ -115,6 +119,9 @@ export const updateUserRole = createServerFn({ method: "POST" })
       userId: z.string(),
       role: z.enum(["super_admin", "unit_admin"]),
       unitIds: z.array(z.string()).default([]),
+      fullName: z.string().optional(),
+      position: z.string().optional(),
+      phone: z.string().optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -153,9 +160,29 @@ export const updateUserRole = createServerFn({ method: "POST" })
     // 4. Update user metadata
     const { data: existingUser } = await supabaseAdmin.auth.admin.getUserById(data.userId);
     const existingMeta = existingUser?.user?.user_metadata || {};
+
+    let unitName = existingMeta.unit_name;
+    if (data.role === "unit_admin" && data.unitIds[0]) {
+      const { data: u } = await supabaseAdmin
+        .from("units")
+        .select("name")
+        .eq("id", data.unitIds[0])
+        .maybeSingle();
+      if (u?.name) unitName = u.name;
+    }
+
+    const updatedFullName = data.fullName !== undefined ? data.fullName.trim() : (existingMeta.full_name || existingMeta.name || null);
+    const updatedPosition = data.position !== undefined ? data.position.trim() : (existingMeta.position || null);
+    const updatedPhone = data.phone !== undefined ? data.phone.trim() : (existingMeta.phone || null);
+
     await supabaseAdmin.auth.admin.updateUserById(data.userId, {
       user_metadata: {
         ...existingMeta,
+        full_name: updatedFullName,
+        name: updatedFullName,
+        position: updatedPosition,
+        phone: updatedPhone,
+        unit_name: unitName,
         is_approved: true,
         unit_id: data.role === "unit_admin" ? data.unitIds[0] || null : null,
       },

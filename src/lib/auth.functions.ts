@@ -162,6 +162,7 @@ export const requestRegistrationApproval = createServerFn({ method: "POST" })
         unit_name: unit?.name || null,
         requested_role: requestedRole,
         is_approved: false,
+        registration_completed: true,
       },
     });
 

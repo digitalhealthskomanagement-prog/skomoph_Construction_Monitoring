@@ -43,6 +43,7 @@ interface AdminUser {
   unit_name?: string;
   created_at: string;
   is_approved: boolean;
+  has_submitted_registration?: boolean;
   role: "super_admin" | "unit_admin" | null;
   requested_role: string | null;
   unit_ids: string[];
@@ -99,6 +100,9 @@ function AdminUsersPage() {
       userId: string;
       role: "super_admin" | "unit_admin";
       unitIds?: string[];
+      fullName?: string;
+      position?: string;
+      phone?: string;
     }) => updateUserRoleFn({ data: vars }),
     onSuccess: () => {
       toast.success("อัปเดตข้อมูลผู้ใช้สำเร็จ");
@@ -151,7 +155,8 @@ function AdminUsersPage() {
 
   if (isLoadingUsers) return <div className="p-8 text-center">กำลังโหลดข้อมูลผู้ใช้...</div>;
 
-  const pendingCount = usersData?.users.filter((u) => !u.is_approved).length || 0;
+  const pendingCount =
+    usersData?.users.filter((u) => !u.is_approved && u.has_submitted_registration).length || 0;
 
   return (
     <div className="container mx-auto max-w-6xl p-6">
@@ -213,8 +218,16 @@ function AdminUsersPage() {
                         </div>
                       )}
                       {isPending && (
-                        <span className="text-[11px] text-amber-700 dark:text-amber-400 font-normal mt-1">
-                          ยื่นขอสมัครเมื่อ {new Date(user.created_at).toLocaleDateString("th-TH")}
+                        <span className="text-[11px] font-normal mt-1">
+                          {user.has_submitted_registration ? (
+                            <span className="text-amber-700 dark:text-amber-400">
+                              ยื่นขอสมัครเมื่อ {new Date(user.created_at).toLocaleDateString("th-TH")}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground italic">
+                              ล็อกอินเมื่อ {new Date(user.created_at).toLocaleDateString("th-TH")} (ยังไม่กรอกข้อมูล)
+                            </span>
+                          )}
                         </span>
                       )}
                     </div>
@@ -233,7 +246,7 @@ function AdminUsersPage() {
                           Unit Admin
                         </Badge>
                       )
-                    ) : (
+                    ) : user.has_submitted_registration ? (
                       <div className="flex flex-col gap-1 items-start">
                         <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-300 gap-1 font-semibold">
                           <Clock className="size-3" /> รออนุมัติสิทธิ์
@@ -243,6 +256,18 @@ function AdminUsersPage() {
                           {user.requested_role === "super_admin"
                             ? "Super Admin (สสจ.)"
                             : "Unit Admin"}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-1 items-start">
+                        <Badge
+                          variant="outline"
+                          className="bg-muted text-muted-foreground border-dashed gap-1 font-normal text-xs"
+                        >
+                          <Clock className="size-3" /> ยังไม่ส่งใบสมัคร
+                        </Badge>
+                        <span className="text-[11px] text-amber-600 dark:text-amber-400">
+                          (ยังไม่เลือกหน่วยบริการ)
                         </span>
                       </div>
                     )}
@@ -328,7 +353,13 @@ function AdminUsersPage() {
           units={unitsData || []}
           isOpen={isEditDialogOpen}
           onClose={() => setIsEditDialogOpen(false)}
-          onSave={(data: { role: "super_admin" | "unit_admin"; unitIds?: string[] }) =>
+          onSave={(data: {
+            role: "super_admin" | "unit_admin";
+            unitIds?: string[];
+            fullName?: string;
+            position?: string;
+            phone?: string;
+          }) =>
             updateMutation.mutate({ userId: selectedUser.id, ...data })
           }
           isPending={updateMutation.isPending}
@@ -343,11 +374,20 @@ interface EditUserDialogProps {
   units: UnitItem[];
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: { role: "super_admin" | "unit_admin"; unitIds: string[] }) => void;
+  onSave: (data: {
+    role: "super_admin" | "unit_admin";
+    unitIds: string[];
+    fullName?: string;
+    position?: string;
+    phone?: string;
+  }) => void;
   isPending: boolean;
 }
 
 function EditUserDialog({ user, units, isOpen, onClose, onSave, isPending }: EditUserDialogProps) {
+  const [fullName, setFullName] = useState(user.full_name || "");
+  const [position, setPosition] = useState(user.position || "");
+  const [phone, setPhone] = useState(user.phone || "");
   const [role, setRole] = useState<"super_admin" | "unit_admin">(
     user.role || (user.requested_role === "super_admin" ? "super_admin" : "unit_admin"),
   );
@@ -366,23 +406,51 @@ function EditUserDialog({ user, units, isOpen, onClose, onSave, isPending }: Edi
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[460px]">
+      <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle>
-            {!user.is_approved ? "ระบุสิทธิ์และหน่วยบริการเพื่ออนุมัติ" : "แก้ไขสิทธิ์ผู้ใช้งาน"}
+            {!user.is_approved ? "ระบุสิทธิ์และหน่วยบริการเพื่ออนุมัติ" : "แก้ไขข้อมูลและสิทธิ์ผู้ใช้งาน"}
           </DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-1.5 p-3 bg-muted/60 rounded-lg text-xs space-y-1">
-            <div className="font-semibold text-sm text-foreground">
-              {user.full_name || user.email}
+        <div className="grid gap-4 py-2 max-h-[75vh] overflow-y-auto px-1">
+          {/* User Profile Fields (Editable) */}
+          <div className="grid gap-3 p-3 bg-muted/40 rounded-lg border text-xs">
+            <div className="grid gap-1.5">
+              <Label className="text-xs font-medium text-foreground">ชื่อ-นามสกุล</Label>
+              <Input
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="ระบุชื่อ-นามสกุลจริง"
+                className="h-8 text-xs bg-background"
+              />
             </div>
-            <div className="text-muted-foreground font-mono">{user.email}</div>
-            {user.position && <div className="text-muted-foreground">ตำแหน่ง: {user.position}</div>}
-            {user.phone && <div className="text-muted-foreground">โทร: {user.phone}</div>}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-1">
+                <Label className="text-xs font-medium text-foreground">ตำแหน่งงาน</Label>
+                <Input
+                  value={position}
+                  onChange={(e) => setPosition(e.target.value)}
+                  placeholder="เช่น เจ้าพนักงานพัสดุ"
+                  className="h-8 text-xs bg-background"
+                />
+              </div>
+              <div className="grid gap-1">
+                <Label className="text-xs font-medium text-foreground">เบอร์โทรศัพท์</Label>
+                <Input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="เช่น 0812345678"
+                  className="h-8 text-xs bg-background"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t border-border/50">
+              <span>Google Account:</span>
+              <span className="font-mono">{user.email}</span>
+            </div>
             {!user.is_approved && (!user.unit_ids || user.unit_ids.length === 0) && (
-              <div className="text-amber-700 dark:text-amber-400 font-medium pt-1 border-t border-border/50">
-                * ผู้ใช้งานยังไม่ได้ระบุหน่วยบริการในแบบฟอร์มลงทะเบียน กรุณาเลือกหน่วยบริการให้ผู้ใช้ด้านล่างนี้
+              <div className="text-amber-700 dark:text-amber-400 font-medium pt-1 text-[11px]">
+                * ผู้ใช้งานยังไม่ได้เลือกหน่วยบริการในแบบฟอร์ม กรุณาเลือกหน่วยบริการให้ด้านล่างนี้
               </div>
             )}
           </div>
@@ -427,7 +495,7 @@ function EditUserDialog({ user, units, isOpen, onClose, onSave, isPending }: Edi
                     className="pl-9 h-9 text-xs"
                   />
                 </div>
-                <div className="border rounded-md p-2.5 max-h-[220px] overflow-y-auto space-y-1.5">
+                <div className="border rounded-md p-2.5 max-h-[200px] overflow-y-auto space-y-1.5">
                   {filteredUnits.map((u: UnitItem) => (
                     <div
                       key={u.id}
@@ -469,7 +537,13 @@ function EditUserDialog({ user, units, isOpen, onClose, onSave, isPending }: Edi
                 toast.error("กรุณาเลือกหน่วยบริการอย่างน้อย 1 แห่งสำหรับ Unit Admin");
                 return;
               }
-              onSave({ role, unitIds: role === "super_admin" ? [] : unitIds });
+              onSave({
+                role,
+                unitIds: role === "super_admin" ? [] : unitIds,
+                fullName,
+                position,
+                phone,
+              });
             }}
             disabled={isPending}
             className={!user.is_approved ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}

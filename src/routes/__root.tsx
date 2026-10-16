@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 function NotFoundComponent() {
   return (
@@ -116,9 +117,25 @@ function RootComponent() {
     if (typeof window !== "undefined") {
       const hash = window.location.hash;
       const pathname = window.location.pathname;
+
+      // 1. Forward access_token to /login to finish processing
       if (hash.includes("access_token=") && pathname !== "/login" && pathname !== "/register") {
         window.location.replace(`/login${hash}`);
+        return;
       }
+
+      // 2. Check if user is logged into Supabase Auth but has not submitted registration
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          const meta = session.user.user_metadata || {};
+          const isApproved = meta.is_approved === true;
+          const hasSubmitted = Boolean(meta.unit_id || meta.registration_completed);
+
+          if (!isApproved && !hasSubmitted && pathname !== "/register" && pathname !== "/login") {
+            window.location.replace("/register");
+          }
+        }
+      });
     }
   }, []);
 
