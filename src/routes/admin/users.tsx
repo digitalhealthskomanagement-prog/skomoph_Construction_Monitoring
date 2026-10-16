@@ -31,7 +31,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { ShieldCheck, UserCheck, Clock, UserX } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ShieldCheck, UserCheck, Clock, UserX, Search } from "lucide-react";
 
 interface AdminUser {
   id: string;
@@ -125,6 +126,11 @@ function AdminUsersPage() {
   const handleApprove = (user: AdminUser) => {
     const roleToAssign = user.requested_role === "super_admin" ? "super_admin" : "unit_admin";
     const unitId = user.unit_ids?.[0] || null;
+    if (!unitId && roleToAssign !== "super_admin") {
+      toast.info("ผู้ใช้นี้ยังไม่ได้ระบุหน่วยบริการ กรุณาเลือกหน่วยบริการให้ก่อนอนุมัติสิทธิ์");
+      openEditDialog(user);
+      return;
+    }
     approveMutation.mutate({
       userId: user.id,
       role: roleToAssign,
@@ -262,16 +268,37 @@ function AdminUsersPage() {
                   </TableCell>
                   <TableCell className="text-right space-x-2 whitespace-nowrap">
                     {isPending && (
-                      <Button
-                        size="sm"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
-                        disabled={approveMutation.isPending}
-                        onClick={() => handleApprove(user)}
-                      >
-                        <UserCheck className="size-3.5 mr-1" />
-                        อนุมัติสิทธิ์ (
-                        {user.requested_role === "super_admin" ? "Super Admin" : "Unit Admin"})
-                      </Button>
+                      user.unit_ids && user.unit_ids.length > 0 ? (
+                        <Button
+                          size="sm"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
+                          disabled={approveMutation.isPending}
+                          onClick={() => handleApprove(user)}
+                        >
+                          <UserCheck className="size-3.5 mr-1" />
+                          อนุมัติสิทธิ์ (
+                          {user.requested_role === "super_admin" ? "Super Admin" : "Unit Admin"})
+                        </Button>
+                      ) : user.requested_role === "super_admin" ? (
+                        <Button
+                          size="sm"
+                          className="bg-purple-600 hover:bg-purple-700 text-white font-medium shadow-xs"
+                          disabled={approveMutation.isPending}
+                          onClick={() => handleApprove(user)}
+                        >
+                          <UserCheck className="size-3.5 mr-1" />
+                          อนุมัติสิทธิ์ (Super Admin)
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-xs"
+                          onClick={() => openEditDialog(user)}
+                        >
+                          <UserCheck className="size-3.5 mr-1" />
+                          ระบุหน่วยบริการเพื่ออนุมัติ
+                        </Button>
+                      )
                     )}
                     <Button variant="outline" size="sm" onClick={() => openEditDialog(user)}>
                       {isPending ? "กำหนดสิทธิ์อื่น" : "แก้ไขสิทธิ์"}
@@ -296,6 +323,7 @@ function AdminUsersPage() {
 
       {isEditDialogOpen && selectedUser && (
         <EditUserDialog
+          key={selectedUser.id}
           user={selectedUser}
           units={unitsData || []}
           isOpen={isEditDialogOpen}
@@ -320,18 +348,29 @@ interface EditUserDialogProps {
 }
 
 function EditUserDialog({ user, units, isOpen, onClose, onSave, isPending }: EditUserDialogProps) {
-  const [role, setRole] = useState<"super_admin" | "unit_admin">(user.role || "unit_admin");
+  const [role, setRole] = useState<"super_admin" | "unit_admin">(
+    user.role || (user.requested_role === "super_admin" ? "super_admin" : "unit_admin"),
+  );
   const [unitIds, setUnitIds] = useState<string[]>(user.unit_ids || []);
+  const [searchUnit, setSearchUnit] = useState("");
 
   const toggleUnit = (id: string) => {
     setUnitIds((prev) => (prev.includes(id) ? prev.filter((u) => u !== id) : [...prev, id]));
   };
 
+  const filteredUnits = units.filter(
+    (u) =>
+      u.name.toLowerCase().includes(searchUnit.toLowerCase()) ||
+      (u.district && u.district.toLowerCase().includes(searchUnit.toLowerCase())),
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[460px]">
         <DialogHeader>
-          <DialogTitle>แก้ไขสิทธิ์ผู้ใช้งาน</DialogTitle>
+          <DialogTitle>
+            {!user.is_approved ? "ระบุสิทธิ์และหน่วยบริการเพื่ออนุมัติ" : "แก้ไขสิทธิ์ผู้ใช้งาน"}
+          </DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-1.5 p-3 bg-muted/60 rounded-lg text-xs space-y-1">
@@ -341,6 +380,11 @@ function EditUserDialog({ user, units, isOpen, onClose, onSave, isPending }: Edi
             <div className="text-muted-foreground font-mono">{user.email}</div>
             {user.position && <div className="text-muted-foreground">ตำแหน่ง: {user.position}</div>}
             {user.phone && <div className="text-muted-foreground">โทร: {user.phone}</div>}
+            {!user.is_approved && (!user.unit_ids || user.unit_ids.length === 0) && (
+              <div className="text-amber-700 dark:text-amber-400 font-medium pt-1 border-t border-border/50">
+                * ผู้ใช้งานยังไม่ได้ระบุหน่วยบริการในแบบฟอร์มลงทะเบียน กรุณาเลือกหน่วยบริการให้ผู้ใช้ด้านล่างนี้
+              </div>
+            )}
           </div>
 
           <div className="grid gap-2">
@@ -353,35 +397,64 @@ function EditUserDialog({ user, units, isOpen, onClose, onSave, isPending }: Edi
                 <SelectValue placeholder="เลือกระดับสิทธิ์" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="unit_admin">Unit Admin (เจ้าหน้าที่ รพ.)</SelectItem>
+                <SelectItem value="unit_admin">Unit Admin (เจ้าหน้าที่ รพ. / รพ.สต.)</SelectItem>
                 <SelectItem value="super_admin">Super Admin (แอดมิน สสจ.)</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="grid gap-2">
-            <Label>หน่วยบริการที่ดูแล (สำหรับ Unit Admin)</Label>
+            <div className="flex items-center justify-between">
+              <Label>หน่วยบริการที่ดูแล (สำหรับ Unit Admin)</Label>
+              {role === "unit_admin" && unitIds.length > 0 && (
+                <span className="text-[11px] text-emerald-600 font-medium">
+                  เลือกแล้ว {unitIds.length} แห่ง
+                </span>
+              )}
+            </div>
             {role === "super_admin" ? (
-              <div className="text-sm text-muted-foreground italic">
-                Super Admin มีสิทธิ์เข้าถึงทุกหน่วยบริการ
+              <div className="text-xs text-muted-foreground italic bg-muted/40 p-3 rounded-md">
+                Super Admin มีสิทธิ์เข้าถึงทุกหน่วยบริการทั่วทั้งจังหวัดสระแก้ว
               </div>
             ) : (
-              <div className="border rounded-md p-3 max-h-[200px] overflow-y-auto space-y-2">
-                {units.map((u: UnitItem) => (
-                  <div key={u.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`unit-${u.id}`}
-                      checked={unitIds.includes(u.id)}
-                      onCheckedChange={() => toggleUnit(u.id)}
-                    />
-                    <Label
-                      htmlFor={`unit-${u.id}`}
-                      className="text-sm font-normal cursor-pointer leading-none"
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+                  <Input
+                    placeholder="ค้นหาชื่อหน่วยบริการ หรืออำเภอ..."
+                    value={searchUnit}
+                    onChange={(e) => setSearchUnit(e.target.value)}
+                    className="pl-9 h-9 text-xs"
+                  />
+                </div>
+                <div className="border rounded-md p-2.5 max-h-[220px] overflow-y-auto space-y-1.5">
+                  {filteredUnits.map((u: UnitItem) => (
+                    <div
+                      key={u.id}
+                      className="flex items-center space-x-2 py-1 px-1.5 rounded hover:bg-muted/50 transition-colors"
                     >
-                      {u.name}
-                    </Label>
-                  </div>
-                ))}
+                      <Checkbox
+                        id={`unit-${u.id}`}
+                        checked={unitIds.includes(u.id)}
+                        onCheckedChange={() => toggleUnit(u.id)}
+                      />
+                      <Label
+                        htmlFor={`unit-${u.id}`}
+                        className="text-xs font-normal cursor-pointer leading-tight flex-1 flex items-center justify-between"
+                      >
+                        <span className="font-medium text-foreground">{u.name}</span>
+                        {u.district && (
+                          <span className="text-[11px] text-muted-foreground">อ.{u.district}</span>
+                        )}
+                      </Label>
+                    </div>
+                  ))}
+                  {filteredUnits.length === 0 && (
+                    <div className="text-center py-4 text-xs text-muted-foreground">
+                      ไม่พบหน่วยบริการที่ค้นหา
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -391,10 +464,21 @@ function EditUserDialog({ user, units, isOpen, onClose, onSave, isPending }: Edi
             ยกเลิก
           </Button>
           <Button
-            onClick={() => onSave({ role, unitIds: role === "super_admin" ? [] : unitIds })}
+            onClick={() => {
+              if (role === "unit_admin" && unitIds.length === 0) {
+                toast.error("กรุณาเลือกหน่วยบริการอย่างน้อย 1 แห่งสำหรับ Unit Admin");
+                return;
+              }
+              onSave({ role, unitIds: role === "super_admin" ? [] : unitIds });
+            }}
             disabled={isPending}
+            className={!user.is_approved ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
           >
-            {isPending ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
+            {isPending
+              ? "กำลังบันทึก..."
+              : !user.is_approved
+                ? "อนุมัติและบันทึกสิทธิ์"
+                : "บันทึกข้อมูล"}
           </Button>
         </DialogFooter>
       </DialogContent>

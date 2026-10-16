@@ -86,7 +86,7 @@ export const approveUser = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
     } else {
       if (!data.unitId) {
-        throw new Error("Unit Admin must have at least one unit assigned");
+        throw new Error("เจ้าหน้าที่ระดับ Unit Admin ต้องมีหน่วยบริการที่สังกัดอย่างน้อย 1 แห่ง (กรุณากด 'กำหนดสิทธิ์อื่น' เพื่อเลือกหน่วยบริการ)");
       }
       const { error } = await supabaseAdmin.from("user_roles").insert({
         user_id: data.userId,
@@ -139,7 +139,7 @@ export const updateUserRole = createServerFn({ method: "POST" })
       });
     } else {
       if (data.unitIds.length === 0) {
-        throw new Error("Unit Admin must have at least one unit assigned");
+        throw new Error("เจ้าหน้าที่ระดับ Unit Admin ต้องมีหน่วยบริการที่สังกัดอย่างน้อย 1 แห่ง");
       }
       const inserts = data.unitIds.map((uid) => ({
         user_id: data.userId,
@@ -149,6 +149,17 @@ export const updateUserRole = createServerFn({ method: "POST" })
       const { error } = await supabaseAdmin.from("user_roles").insert(inserts);
       if (error) throw new Error(error.message);
     }
+
+    // 4. Update user metadata
+    const { data: existingUser } = await supabaseAdmin.auth.admin.getUserById(data.userId);
+    const existingMeta = existingUser?.user?.user_metadata || {};
+    await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+      user_metadata: {
+        ...existingMeta,
+        is_approved: true,
+        unit_id: data.role === "unit_admin" ? data.unitIds[0] || null : null,
+      },
+    });
 
     return { success: true };
   });
