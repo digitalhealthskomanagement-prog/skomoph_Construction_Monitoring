@@ -74,26 +74,6 @@ export const setSessionCookie = createServerFn({ method: "POST" })
       }
     }
 
-    // Auto-assign admin if missing and email matches primary root admin
-    if (
-      !role &&
-      (user.email === "digitalhealthsko.management@gmail.com" ||
-        user.email === "admin@skomoph.local")
-    ) {
-      const { data: newRole } = await supabaseAdmin
-        .from("user_roles")
-        .insert({
-          user_id: user.id,
-          role: "super_admin",
-          unit_id: null,
-        })
-        .select()
-        .single();
-      if (newRole) {
-        role = "super_admin";
-      }
-    }
-
     // If user has no approved role in user_roles, check if they need to complete registration or are pending approval
     if (!role) {
       const metadata = user.user_metadata || {};
