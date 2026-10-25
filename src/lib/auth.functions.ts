@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const sessionSchema = z.object({
   access_token: z.string(),
@@ -126,17 +127,19 @@ export const setSessionCookie = createServerFn({ method: "POST" })
   });
 
 export const requestRegistrationApproval = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator(
     z.object({
-      userId: z.string(),
-      unitId: z.string(),
+      unitId: z.string().uuid(),
       fullName: z.string().optional(),
       position: z.string().optional(),
       phone: z.string().optional(),
     }),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Only ever act on the caller's own account, taken from the verified bearer token
+    const userId = context.userId;
 
     const { data: unit } = await supabaseAdmin
       .from("units")
@@ -148,11 +151,11 @@ export const requestRegistrationApproval = createServerFn({ method: "POST" })
     const requestedRole = isSsj ? "super_admin" : "unit_admin";
 
     // Fetch existing user metadata
-    const { data: existingUser } = await supabaseAdmin.auth.admin.getUserById(data.userId);
+    const { data: existingUser } = await supabaseAdmin.auth.admin.getUserById(userId);
     const existingMeta = existingUser?.user?.user_metadata || {};
 
     // Store in user_metadata so admin can see their full profile and requested unit
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
       user_metadata: {
         ...existingMeta,
         full_name: data.fullName || existingMeta.full_name || existingMeta.name || null,
@@ -171,7 +174,7 @@ export const requestRegistrationApproval = createServerFn({ method: "POST" })
     }
 
     // Ensure they do NOT have any active role in user_roles until approved
-    await supabaseAdmin.from("user_roles").delete().eq("user_id", data.userId);
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
 
     return { ok: true as const, requestedRole, isSsj };
   });

@@ -218,7 +218,6 @@ function Register() {
     try {
       await requestApproval({
         data: {
-          userId: authUser.id,
           unitId: unitId,
           fullName: fullName.trim(),
           position: position.trim(),

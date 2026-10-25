@@ -11,31 +11,40 @@ async function admin() {
   return supabaseAdmin;
 }
 
+// Every project the request touches must belong to the caller: the project of the
+// existing record (when updating/deleting by id) AND any project/phase given in the
+// payload. Trusting the payload alone would let a unit admin edit or move records
+// owned by other units.
 async function verifyProjectAccess(auth: any, sb: any, table: string | null, id: string | null, payloadProjectId: string | null = null, payloadPhaseId: string | null = null) {
   if (auth.role === "super_admin") return true;
   if (auth.role !== "unit_admin" || !auth.unitIds || auth.unitIds.length === 0) return false;
-  
-  let targetProjectId = payloadProjectId;
-  
-  if (!targetProjectId && payloadPhaseId) {
-    const { data } = await sb.from("phases").select("project_id").eq("id", payloadPhaseId).maybeSingle();
-    targetProjectId = data?.project_id;
-  }
 
-  if (!targetProjectId && id && table) {
+  const projectIds: (string | null | undefined)[] = [];
+
+  if (id && table) {
     if (table === "projects") {
-      targetProjectId = id;
+      projectIds.push(id);
     } else {
       const { data } = await sb.from(table).select("project_id").eq("id", id).maybeSingle();
-      targetProjectId = data?.project_id;
+      if (!data) return false;
+      projectIds.push(data.project_id);
     }
   }
 
-  if (!targetProjectId) return false;
+  if (payloadProjectId) projectIds.push(payloadProjectId);
 
-  // Check if any of the user's units own this project
-  const { data: proj } = await sb.from("projects").select("unit_id").eq("id", targetProjectId).maybeSingle();
-  return proj && auth.unitIds.includes(proj.unit_id);
+  if (payloadPhaseId) {
+    const { data } = await sb.from("phases").select("project_id").eq("id", payloadPhaseId).maybeSingle();
+    if (!data) return false;
+    projectIds.push(data.project_id);
+  }
+
+  if (projectIds.length === 0 || projectIds.some((p) => !p)) return false;
+
+  const unique = [...new Set(projectIds as string[])];
+  const { data: projs } = await sb.from("projects").select("id, unit_id").in("id", unique);
+  if (!projs || projs.length !== unique.length) return false;
+  return projs.every((p: { unit_id: string }) => auth.unitIds.includes(p.unit_id));
 }
 
 async function signImage(path: string | null): Promise<string | null> {
@@ -671,15 +680,15 @@ export const deletePhase = createServerFn({ method: "POST" })
   });
 
 export const reorderPhases = createServerFn({ method: "POST" })
-  .inputValidator((d: { ids: string[] }) => d)
+  .inputValidator((d: { ids: string[] }) => z.object({ ids: z.array(z.string().uuid()).max(200) }).parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
     if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
 
     const sb = await admin();
-    if (data.ids.length > 0) {
-       const hasAccess = await verifyProjectAccess(auth, sb, "phases", data.ids[0]);
-       if (!hasAccess) return { ok: false as const, reason: "unauthorized" as const };
+    for (const id of data.ids) {
+      const hasAccess = await verifyProjectAccess(auth, sb, "phases", id);
+      if (!hasAccess) return { ok: false as const, reason: "unauthorized" as const };
     }
 
     await Promise.all(data.ids.map((id, i) => sb.from("phases").update({ order: i }).eq("id", id)));
