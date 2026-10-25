@@ -23,47 +23,13 @@ export const setSessionCookie = createServerFn({ method: "POST" })
     }
 
     // Fetch all roles for user
-    let { data: roleDataArray } = await supabaseAdmin
+    const { data: roleDataArray } = await supabaseAdmin
       .from("user_roles")
       .select("role, unit_id")
       .eq("user_id", user.id);
 
     let role: "super_admin" | "unit_admin" | null = null;
     let unitIds: string[] = [];
-
-    // Auto-migrate role from existing account with matching email if present
-    if ((!roleDataArray || roleDataArray.length === 0) && user.email) {
-      try {
-        const { data: allUsers } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-        const matchingUsers = (allUsers?.users || []).filter(
-          (u) => u.email?.toLowerCase() === user.email?.toLowerCase() && u.id !== user.id,
-        );
-        if (matchingUsers.length > 0) {
-          const oldIds = matchingUsers.map((u) => u.id);
-          const { data: legacyRoles } = await supabaseAdmin
-            .from("user_roles")
-            .select("role, unit_id")
-            .in("user_id", oldIds);
-
-          if (legacyRoles && legacyRoles.length > 0) {
-            for (const r of legacyRoles) {
-              await supabaseAdmin.from("user_roles").upsert({
-                user_id: user.id,
-                role: r.role,
-                unit_id: r.unit_id,
-              });
-            }
-            const { data: refreshedRoles } = await supabaseAdmin
-              .from("user_roles")
-              .select("role, unit_id")
-              .eq("user_id", user.id);
-            roleDataArray = refreshedRoles;
-          }
-        }
-      } catch (err) {
-        console.error("Role migration error:", err);
-      }
-    }
 
     if (roleDataArray && roleDataArray.length > 0) {
       if (roleDataArray.some((r) => r.role === "super_admin")) {

@@ -11,6 +11,11 @@ async function admin() {
   return supabaseAdmin;
 }
 
+// Only paths issued by createUpdateImageUpload / createHeroImageUpload are accepted,
+// so stored image references can't point at arbitrary external URLs.
+const storagePath = z.string().regex(/^(hero\/)?\d+-[a-z0-9]{1,8}\.(jpg|png)$/);
+const idInput = z.object({ id: z.string().uuid() });
+
 // Every project the request touches must belong to the caller: the project of the
 // existing record (when updating/deleting by id) AND any project/phase given in the
 // payload. Trusting the payload alone would let a unit admin edit or move records
@@ -241,7 +246,7 @@ export const saveEvent = createServerFn({ method: "POST" })
   });
 
 export const deleteEvent = createServerFn({ method: "POST" })
-  .inputValidator((d: { id: string }) => d)
+  .inputValidator((d: { id: string }) => idInput.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
     if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
@@ -303,9 +308,9 @@ const updateSchema = z.object({
   reporter_name: z.string().optional().nullable(),
   phase_id: z.string().uuid().nullable().optional(),
   progress_snapshot: z.number().nullable().optional(),
-  image_path: z.string().nullable().optional(),
-  image_paths: z.array(z.string()).max(4).optional(),
-  thumb_paths: z.array(z.string()).max(4).optional(),
+  image_path: storagePath.nullable().optional(),
+  image_paths: z.array(storagePath).max(4).optional(),
+  thumb_paths: z.array(storagePath).max(4).optional(),
   project_id: z.string().uuid().optional(),
 });
 
@@ -369,7 +374,7 @@ export const postUpdate = createServerFn({ method: "POST" })
   });
 
 export const deleteUpdate = createServerFn({ method: "POST" })
-  .inputValidator((d: { id: string }) => d)
+  .inputValidator((d: { id: string }) => idInput.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
     if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
@@ -432,7 +437,7 @@ export const saveRisk = createServerFn({ method: "POST" })
   });
 
 export const deleteRisk = createServerFn({ method: "POST" })
-  .inputValidator((d: { id: string }) => d)
+  .inputValidator((d: { id: string }) => idInput.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
     if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
@@ -464,7 +469,7 @@ const settingsSchema = z.object({
   cons_heading: z.string().nullable().optional(),
   cons_subtitle: z.string().nullable().optional(),
   calendar_start_month: z.string().nullable().optional(),
-  hero_image_path: z.string().nullable().optional(),
+  hero_image_path: storagePath.nullable().optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -525,7 +530,7 @@ export const saveUnit = createServerFn({ method: "POST" })
   });
 
 export const deleteUnit = createServerFn({ method: "POST" })
-  .inputValidator((d: { id: string }) => d)
+  .inputValidator((d: { id: string }) => idInput.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
     if (!auth.unlocked || auth.role !== "super_admin") return { ok: false as const, reason: "unauthorized" as const };
@@ -537,7 +542,9 @@ export const deleteUnit = createServerFn({ method: "POST" })
   });
 
 export const createProject = createServerFn({ method: "POST" })
-  .inputValidator((d: { title: string; unitId: string; }) => d)
+  .inputValidator((d: { title: string; unitId: string }) =>
+    z.object({ title: z.string().min(1).max(300), unitId: z.string().uuid() }).parse(d),
+  )
   .handler(async ({ data }) => {
     const auth = await getAuth();
     if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
@@ -581,7 +588,7 @@ export const createProject = createServerFn({ method: "POST" })
   });
 
 export const deleteProject = createServerFn({ method: "POST" })
-  .inputValidator((d: { id: string; }) => d)
+  .inputValidator((d: { id: string }) => idInput.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
     if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
@@ -601,7 +608,7 @@ export const deleteProject = createServerFn({ method: "POST" })
 
 
 export const createHeroImageUpload = createServerFn({ method: "POST" })
-  .inputValidator((d: { ext: string }) => d)
+  .inputValidator((d: { ext: string }) => z.object({ ext: z.string().max(10) }).parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
     if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
@@ -662,7 +669,7 @@ export const savePhase = createServerFn({ method: "POST" })
   });
 
 export const deletePhase = createServerFn({ method: "POST" })
-  .inputValidator((d: { id: string }) => d)
+  .inputValidator((d: { id: string }) => idInput.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
     if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
@@ -702,7 +709,7 @@ const resourceSchema = z.object({
   id: z.string().uuid().optional(),
   label: z.string().min(1),
   description: z.string().nullable().optional(),
-  url: z.string().url(),
+  url: z.string().url().refine((u) => /^https?:\/\//i.test(u), "ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://"),
   icon: z.string().default("link"),
   order: z.number().default(0),
 });
@@ -733,7 +740,7 @@ export const saveResourceLink = createServerFn({ method: "POST" })
   });
 
 export const deleteResourceLink = createServerFn({ method: "POST" })
-  .inputValidator((d: { id: string }) => d)
+  .inputValidator((d: { id: string }) => idInput.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
     if (!auth.unlocked || auth.role !== "super_admin") return { ok: false as const, reason: "unauthorized" as const };
