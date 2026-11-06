@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { dbError } from "./server-errors";
 
 async function getAuth() {
   const mod = await import("./auth.server");
@@ -224,7 +225,7 @@ export const saveEvent = createServerFn({ method: "POST" })
         phase_id: data.phase_id ?? null,
         note: data.note ?? null,
       }).eq("id", data.id);
-      if (error) throw error;
+      if (error) throw dbError(error);
     } else {
       let projectId = data.project_id;
       if (!projectId && data.phase_id) {
@@ -241,7 +242,7 @@ export const saveEvent = createServerFn({ method: "POST" })
         note: data.note ?? null,
         project_id: projectId,
       });
-      if (error) throw error;
+      if (error) throw dbError(error);
     }
     return { ok: true as const };
   });
@@ -257,7 +258,7 @@ export const deleteEvent = createServerFn({ method: "POST" })
     if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
     const { error } = await sb.from("calendar_events").delete().eq("id", data.id);
-    if (error) throw error;
+    if (error) throw dbError(error);
     return { ok: true as const };
   });
 
@@ -278,7 +279,7 @@ export const updatePhaseProgress = createServerFn({ method: "POST" })
     if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
     const { error } = await sb.from("phases").update({ progress: data.progress }).eq("id", data.id);
-    if (error) throw error;
+    if (error) throw dbError(error);
 
     let projectId = data.project_id;
     if (!projectId) {
@@ -332,7 +333,7 @@ export const createUpdateImageUpload = createServerFn({ method: "POST" })
       const safeExt = ext === "png" ? "png" : "jpg";
       const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${safeExt}`;
       const { data: signed, error } = await sb.storage.from("updates").createSignedUploadUrl(path);
-      if (error || !signed) throw error ?? new Error("สร้างลิงก์อัปโหลดรูปไม่ได้");
+      if (error || !signed) throw error ? dbError(error, "storage") : new Error("สร้างลิงก์อัปโหลดรูปไม่ได้");
       tickets.push({ path, token: signed.token });
     }
     return { ok: true as const, tickets };
@@ -371,7 +372,7 @@ export const postUpdate = createServerFn({ method: "POST" })
       image_urls: paths,
       thumb_urls: (data.thumb_paths ?? []).slice(0, 4),
     });
-    if (error) throw error;
+    if (error) throw dbError(error);
     return { ok: true as const };
   });
 
@@ -386,7 +387,7 @@ export const deleteUpdate = createServerFn({ method: "POST" })
     if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
     const { error } = await sb.from("updates").delete().eq("id", data.id);
-    if (error) throw error;
+    if (error) throw dbError(error);
     return { ok: true as const };
   });
 
@@ -430,10 +431,10 @@ export const saveRisk = createServerFn({ method: "POST" })
     };
     if (data.id) {
       const { error } = await sb.from("risks").update(payload).eq("id", data.id);
-      if (error) throw error;
+      if (error) throw dbError(error);
     } else {
       const { error } = await sb.from("risks").insert(payload);
-      if (error) throw error;
+      if (error) throw dbError(error);
     }
     return { ok: true as const };
   });
@@ -449,7 +450,7 @@ export const deleteRisk = createServerFn({ method: "POST" })
     if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
     const { error } = await sb.from("risks").delete().eq("id", data.id);
-    if (error) throw error;
+    if (error) throw dbError(error);
     return { ok: true as const };
   });
 
@@ -488,7 +489,7 @@ export const saveSettings = createServerFn({ method: "POST" })
     const { id, ...rest } = data;
     const payload = { ...rest, updated_at: new Date().toISOString() };
     const { error } = await sb.from("projects").update(payload).eq("id", id);
-    if (error) throw error;
+    if (error) throw dbError(error);
     return { ok: true as const };
   });
 
@@ -523,10 +524,10 @@ export const saveUnit = createServerFn({ method: "POST" })
     
     if (data.id) {
       const { error } = await sb.from("units").update(payload).eq("id", data.id);
-      if (error) throw error;
+      if (error) throw dbError(error);
     } else {
       const { error } = await sb.from("units").insert(payload);
-      if (error) throw error;
+      if (error) throw dbError(error);
     }
     return { ok: true as const };
   });
@@ -539,7 +540,7 @@ export const deleteUnit = createServerFn({ method: "POST" })
     
     const sb = await admin();
     const { error } = await sb.from("units").delete().eq("id", data.id);
-    if (error) throw error;
+    if (error) throw dbError(error);
     return { ok: true as const };
   });
 
@@ -564,7 +565,7 @@ export const createProject = createServerFn({ method: "POST" })
       end_date: new Date().toISOString().split("T")[0],
       is_active: true,
     }).select("id").single();
-    if (error || !proj) throw error ?? new Error("Failed to create project");
+    if (error || !proj) throw error ? dbError(error) : new Error("สร้างโครงการไม่สำเร็จ");
 
     // Insert default preparation phases
     const defaultPhases = [
@@ -604,7 +605,7 @@ export const deleteProject = createServerFn({ method: "POST" })
       }
     }
     const { error } = await sb.from("projects").delete().eq("id", data.id);
-    if (error) throw error;
+    if (error) throw dbError(error);
     return { ok: true as const };
   });
 
@@ -620,7 +621,7 @@ export const createHeroImageUpload = createServerFn({ method: "POST" })
     const ext = clean === "png" ? "png" : "jpg";
     const path = `hero/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const { data: signed, error } = await sb.storage.from("updates").createSignedUploadUrl(path);
-    if (error || !signed) throw error ?? new Error("สร้างลิงก์อัปโหลดรูปไม่ได้");
+    if (error || !signed) throw error ? dbError(error, "storage") : new Error("สร้างลิงก์อัปโหลดรูปไม่ได้");
     return { ok: true as const, path, token: signed.token };
   });
 
@@ -662,10 +663,10 @@ export const savePhase = createServerFn({ method: "POST" })
     };
     if (data.id) {
       const { error } = await sb.from("phases").update(payload).eq("id", data.id);
-      if (error) throw error;
+      if (error) throw dbError(error);
     } else {
       const { error } = await sb.from("phases").insert(payload);
-      if (error) throw error;
+      if (error) throw dbError(error);
     }
     return { ok: true as const };
   });
@@ -684,7 +685,7 @@ export const deletePhase = createServerFn({ method: "POST" })
     await sb.from("updates").update({ phase_id: null }).eq("phase_id", data.id);
     await sb.from("risks").delete().eq("phase_id", data.id);
     const { error } = await sb.from("phases").delete().eq("id", data.id);
-    if (error) throw error;
+    if (error) throw dbError(error);
     return { ok: true as const };
   });
 
@@ -733,10 +734,10 @@ export const saveResourceLink = createServerFn({ method: "POST" })
     };
     if (data.id) {
       const { error } = await sb.from("resource_links").update(payload).eq("id", data.id);
-      if (error) throw error;
+      if (error) throw dbError(error);
     } else {
       const { error } = await sb.from("resource_links").insert(payload);
-      if (error) throw error;
+      if (error) throw dbError(error);
     }
     return { ok: true as const };
   });
@@ -749,6 +750,6 @@ export const deleteResourceLink = createServerFn({ method: "POST" })
 
     const sb = await admin();
     const { error } = await sb.from("resource_links").delete().eq("id", data.id);
-    if (error) throw error;
+    if (error) throw dbError(error);
     return { ok: true as const };
   });

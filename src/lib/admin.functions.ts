@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { dbError } from "./server-errors";
 import type { User } from "@supabase/supabase-js";
 
 type AdminClient = typeof import("@/integrations/supabase/client.server").supabaseAdmin;
@@ -23,7 +24,7 @@ async function listAllAuthUsers(sb: AdminClient) {
   const all: User[] = [];
   for (let page = 1; page <= 50; page++) {
     const { data, error } = await sb.auth.admin.listUsers({ page, perPage });
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error);
     all.push(...data.users);
     if (data.users.length < perPage) break;
   }
@@ -45,7 +46,7 @@ async function assertNotRemovingSuperAdmin(
     );
   }
   const { data, error } = await sb.from("user_roles").select("user_id").eq("role", "super_admin");
-  if (error) throw new Error(error.message);
+  if (error) throw dbError(error);
   const supers = new Set((data ?? []).map((r: { user_id: string }) => r.user_id));
   if (supers.has(targetUserId) && supers.size <= 1) {
     throw new Error("ต้องมี Super Admin อย่างน้อย 1 คนในระบบ");
@@ -61,17 +62,17 @@ async function replaceRoles(sb: AdminClient, userId: string, rows: RoleRow[]) {
     .from("user_roles")
     .select("user_id, role, unit_id")
     .eq("user_id", userId);
-  if (readError) throw new Error(readError.message);
+  if (readError) throw dbError(readError);
 
   const { error: deleteError } = await sb.from("user_roles").delete().eq("user_id", userId);
-  if (deleteError) throw new Error(deleteError.message);
+  if (deleteError) throw dbError(deleteError);
 
   const { error: insertError } = await sb.from("user_roles").insert(rows);
   if (insertError) {
     if (previous && previous.length > 0) {
       await sb.from("user_roles").insert(previous as RoleRow[]);
     }
-    throw new Error(insertError.message);
+    throw dbError(insertError);
   }
 }
 
@@ -85,8 +86,8 @@ export const getAllUsers = createServerFn({ method: "GET" }).handler(async () =>
     supabaseAdmin.from("user_roles").select("user_id, role, unit_id"),
     supabaseAdmin.from("units").select("id, name, type"),
   ]);
-  if (rolesRes.error) throw new Error(rolesRes.error.message);
-  if (unitsRes.error) throw new Error(unitsRes.error.message);
+  if (rolesRes.error) throw dbError(rolesRes.error);
+  if (unitsRes.error) throw dbError(unitsRes.error);
   const rolesData = (rolesRes.data ?? []) as RoleRow[];
   const unitById = new Map(
     ((unitsRes.data ?? []) as { id: string; name: string; type: string | null }[]).map((u) => [
@@ -253,7 +254,7 @@ export const deleteUser = createServerFn({ method: "POST" })
     await assertNotRemovingSuperAdmin(supabaseAdmin, ctx.userId, data.userId, null);
 
     const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error);
     // user_roles.user_id has no foreign key to auth.users, so remove the rows here
     await supabaseAdmin.from("user_roles").delete().eq("user_id", data.userId);
 

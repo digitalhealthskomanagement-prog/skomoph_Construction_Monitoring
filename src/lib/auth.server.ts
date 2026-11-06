@@ -1,4 +1,5 @@
 import { getRequestUrl, useSession } from "@tanstack/react-start/server";
+import { dbError } from "./server-errors";
 
 export type AuthSession = {
   unlocked?: boolean;
@@ -51,7 +52,7 @@ export async function getAuthContext() {
     .from("user_roles")
     .select("role, unit_id")
     .eq("user_id", userId);
-  if (error) throw new Error(error.message);
+  if (error) throw dbError(error, "getAuthContext");
 
   if (!roles || roles.length === 0) {
     return { unlocked: false, userId, role: null, unitIds: [] as string[] };
