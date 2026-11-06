@@ -48,7 +48,12 @@ function Home() {
   const params = Route.useParams();
   const { data } = useSuspenseQuery(projectQuery(params.projectId));
   const { data: auth } = useAuthStatus();
-  const editable = !!auth?.unlocked;
+  const settingsUnitId = (data?.settings as { unit_id?: string | null } | null)?.unit_id;
+  // Only show edit controls on projects the signed-in user may actually change
+  const editable =
+    !!auth?.unlocked &&
+    (auth.role === "super_admin" ||
+      (!!settingsUnitId && (auth.unitIds ?? []).includes(settingsUnitId)));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogEvent, setDialogEvent] = useState<CalEvent | null>(null);
   const [dialogDate, setDialogDate] = useState<Date | null>(null);
@@ -172,6 +177,10 @@ function Home() {
                     </Button>
                   </Link>
                 </div>
+              ) : auth?.unlocked ? (
+                <div className="mt-5 rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+                  โครงการนี้อยู่นอกหน่วยบริการที่คุณดูแล — ดูได้อย่างเดียว
+                </div>
               ) : (
                 <div className="mt-5">
                   <Link to="/login">
@@ -239,7 +248,7 @@ function Home() {
 
               {editable && (
                 <div className="bg-white p-1 rounded-2xl border border-neutral-100 shadow-sm">
-                  <UpdateComposer phases={data.phases} />
+                  <UpdateComposer phases={data.phases} projectId={params.projectId} />
                 </div>
               )}
 
@@ -286,6 +295,7 @@ function Home() {
         event={dialogEvent}
         defaultDate={dialogDate}
         phases={data.phases}
+        projectId={params.projectId}
       />
     </div>
   );

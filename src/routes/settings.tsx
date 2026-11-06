@@ -24,13 +24,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RESOURCE_ICON_OPTIONS } from "@/components/project";
+import { RESOURCE_ICON_OPTIONS, compressImage } from "@/components/project";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
 import { ImagePlus, Plus, Save, Trash2, ShieldCheck, Building2, Eye, EyeOff, X, Sparkles } from "lucide-react";
 
 import { z } from "zod";
+import { mutationErrorMessage } from "@/lib/mutation-error";
 
 const settingsSearchSchema = z.object({
   projectId: z.string().uuid().optional(),
@@ -177,7 +178,8 @@ function UnitDashboard({ unitId }: { unitId: string }) {
   const handleCreateProject = async () => {
     try {
       setBusy("creating");
-      await create({ data: { title: "โครงการใหม่", unitId } });
+      const r = await create({ data: { title: "โครงการใหม่", unitId } });
+      if (!r.ok) return toast.error(mutationErrorMessage(r.reason));
       toast.success("สร้างโครงการสำเร็จ!");
       qc.invalidateQueries({ queryKey: ["all-projects"] });
     } catch (e: any) {
@@ -500,7 +502,7 @@ function GlobalResourcesEditor() {
           order: links?.length || 0,
         },
       });
-      if (!r.ok) return toast.error("ไม่มีสิทธิ์");
+      if (!r.ok) return toast.error(mutationErrorMessage(r.reason));
       toast.success("เพิ่มลิงก์แล้ว");
       setDraft({ label: "", description: "", url: "", icon: "link" });
       refetch();
@@ -513,7 +515,7 @@ function GlobalResourcesEditor() {
 
   async function del(id: string) {
     const r = await remove({ data: { id } });
-    if (!r.ok) return toast.error("ไม่มีสิทธิ์");
+    if (!r.ok) return toast.error(mutationErrorMessage(r.reason));
     toast.success("ลบลิงก์แล้ว");
     refetch();
   }
@@ -579,10 +581,12 @@ function UnitSettingsPage({ projectId }: { projectId: string }) {
 
   return (
     <div className="min-h-screen">
-      <SiteHeader />
       <main className="mx-auto max-w-4xl space-y-8 px-4 py-10 sm:px-6">
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">ตั้งค่าโครงการ ({data.settings?.name})</h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">ตั้งค่าโครงการ</h1>
+          {data.settings?.title && (
+            <p className="mt-1 text-base font-medium text-foreground/80">{data.settings.title}</p>
+          )}
           <p className="mt-1 text-sm text-muted-foreground">
             กรอกรายละเอียดโครงการและแบ่งงวดงาน
           </p>
@@ -625,12 +629,15 @@ function ProjectForm({ settings, projectId }: { settings: ProjectSettings | null
   async function onHeroPick(file: File) {
     setBusy(true);
     try {
-      const ext = file.type === "image/png" ? "png" : "jpg";
+      // Shrink to a JPEG/PNG under the storage limit (also turns HEIC/WebP into JPEG)
+      const { blob, ext } = await compressImage(file);
       const t = await createUpload({ data: { ext } });
-      if (!t.ok) throw new Error("เซสชันหมดอายุ");
+      if (!t.ok) throw new Error(mutationErrorMessage(t.reason));
       const { error } = await supabase.storage
         .from("updates")
-        .uploadToSignedUrl(t.path, t.token, file, { contentType: file.type || "image/jpeg" });
+        .uploadToSignedUrl(t.path, t.token, blob, {
+          contentType: ext === "png" ? "image/png" : "image/jpeg",
+        });
       if (error) throw error;
       setHeroPath(t.path);
       toast.success("อัปโหลดรูปแล้ว — กดบันทึกเพื่อยืนยัน");
@@ -667,7 +674,7 @@ function ProjectForm({ settings, projectId }: { settings: ProjectSettings | null
           is_active: isActive,
         },
       });
-      if (!r.ok) return toast.error("ไม่มีสิทธิ์บันทึกข้อมูล");
+      if (!r.ok) return toast.error(mutationErrorMessage(r.reason));
       toast.success("บันทึกข้อมูลโครงการแล้ว");
       qc.invalidateQueries({ queryKey: ["project-data", projectId] });
       qc.invalidateQueries({ queryKey: ["all-projects"] });
@@ -813,7 +820,7 @@ function PhasesEditor({ phases, projectId }: { phases: any[], projectId: string 
           progress: draft.id ? phases.find(p => p.id === draft.id)?.progress ?? 0 : 0,
         },
       });
-      if (!r.ok) return toast.error("ไม่มีสิทธิ์");
+      if (!r.ok) return toast.error(mutationErrorMessage(r.reason));
       toast.success(draft.id ? "แก้ไขเฟสงานแล้ว" : "เพิ่มเฟสงานแล้ว");
       setDraft({ id: undefined, name: "", category: draft.category, code: "", weight: "", duration_label: "" });
       refresh();
@@ -836,7 +843,7 @@ function PhasesEditor({ phases, projectId }: { phases: any[], projectId: string 
 
   async function del(id: string) {
     const r = await remove({ data: { id } });
-    if (!r.ok) return toast.error("ไม่มีสิทธิ์");
+    if (!r.ok) return toast.error(mutationErrorMessage(r.reason));
     toast.success("ลบเฟสงานแล้ว");
     refresh();
   }

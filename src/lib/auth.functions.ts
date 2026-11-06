@@ -18,6 +18,12 @@ export const setSessionCookie = createServerFn({ method: "POST" })
       error: userError,
     } = await supabaseAdmin.auth.getUser(data.access_token);
 
+    // Always drop whatever session cookie this browser already holds before deciding.
+    // Otherwise a cookie left by the previous user on a shared computer (it lives for
+    // days, independently of the Supabase session) would keep acting as that user.
+    const session = await getSession();
+    await session.clear();
+
     if (userError || !user) {
       return { ok: false as const, error: "Invalid token" };
     }
@@ -61,7 +67,6 @@ export const setSessionCookie = createServerFn({ method: "POST" })
       };
     }
 
-    const session = await getSession();
     await session.update({
       unlocked: true,
       userId: user.id,
@@ -77,9 +82,9 @@ export const requestRegistrationApproval = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
       unitId: z.string().uuid(),
-      fullName: z.string().optional(),
-      position: z.string().optional(),
-      phone: z.string().optional(),
+      fullName: z.string().max(200).optional(),
+      position: z.string().max(200).optional(),
+      phone: z.string().max(50).optional(),
     }),
   )
   .handler(async ({ data, context }) => {
@@ -87,11 +92,24 @@ export const requestRegistrationApproval = createServerFn({ method: "POST" })
     // Only ever act on the caller's own account, taken from the verified bearer token
     const userId = context.userId;
 
+    // An already approved user must not be able to drop their own roles (and lock
+    // themselves out) by submitting the registration form again.
+    const { data: existingRoles } = await supabaseAdmin
+      .from("user_roles")
+      .select("id")
+      .eq("user_id", userId)
+      .limit(1);
+    if (existingRoles && existingRoles.length > 0) {
+      throw new Error("บัญชีนี้ได้รับอนุมัติสิทธิ์แล้ว หากต้องการเปลี่ยนหน่วยบริการ กรุณาติดต่อผู้ดูแลระบบ");
+    }
+
     const { data: unit } = await supabaseAdmin
       .from("units")
       .select("type, name")
       .eq("id", data.unitId)
       .maybeSingle();
+
+    if (!unit) throw new Error("ไม่พบหน่วยบริการที่เลือก");
 
     const isSsj = unit?.type === "สสจ." || unit?.name?.includes("สสจ");
     const requestedRole = isSsj ? "super_admin" : "unit_admin";
@@ -118,9 +136,6 @@ export const requestRegistrationApproval = createServerFn({ method: "POST" })
     if (updateError) {
       console.error("requestRegistrationApproval update user error:", updateError);
     }
-
-    // Ensure they do NOT have any active role in user_roles until approved
-    await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
 
     return { ok: true as const, requestedRole, isSsj };
   });

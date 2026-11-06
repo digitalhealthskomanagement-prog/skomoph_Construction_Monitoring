@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { saveRisk, deleteRisk } from "@/lib/data.functions";
 import { toast } from "sonner";
 import { AlertTriangle, Trash2, Plus, Pencil } from "lucide-react";
+import { mutationErrorMessage } from "@/lib/mutation-error";
 
 export type Risk = {
   id: string;
@@ -62,7 +63,7 @@ export function RiskDialog({
       },
     });
     if (!res.ok) {
-      toast.error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง");
+      toast.error(mutationErrorMessage(res.reason));
       return;
     }
     toast.success(editing ? "แก้ไขความเสี่ยงแล้ว" : "เพิ่มความเสี่ยงแล้ว");
@@ -75,7 +76,7 @@ export function RiskDialog({
     if (!confirm("ลบรายการนี้?")) return;
     const res = await del({ data: { id } });
     if (!res.ok) {
-      toast.error("เซสชันหมดอายุ");
+      toast.error(mutationErrorMessage(res.reason));
       return;
     }
     toast.success("ลบแล้ว");

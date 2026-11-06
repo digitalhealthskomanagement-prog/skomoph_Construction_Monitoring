@@ -128,9 +128,15 @@ function AdminUsersPage() {
   });
 
   const handleApprove = (user: AdminUser) => {
-    const roleToAssign = user.requested_role === "super_admin" ? "super_admin" : "unit_admin";
+    // Super Admin is never granted with one click: the admin must open the dialog
+    // and confirm the role there.
+    if (user.requested_role === "super_admin") {
+      openEditDialog(user);
+      return;
+    }
+    const roleToAssign = "unit_admin" as const;
     const unitId = user.unit_ids?.[0] || null;
-    if (!unitId && roleToAssign !== "super_admin") {
+    if (!unitId) {
       toast.info("ผู้ใช้นี้ยังไม่ได้ระบุหน่วยบริการ กรุณาเลือกหน่วยบริการให้ก่อนอนุมัติสิทธิ์");
       openEditDialog(user);
       return;
@@ -293,7 +299,16 @@ function AdminUsersPage() {
                   </TableCell>
                   <TableCell className="text-right space-x-2 whitespace-nowrap">
                     {isPending && (
-                      user.unit_ids && user.unit_ids.length > 0 ? (
+                      user.requested_role === "super_admin" ? (
+                        <Button
+                          size="sm"
+                          className="bg-purple-600 hover:bg-purple-700 text-white font-medium shadow-xs"
+                          onClick={() => openEditDialog(user)}
+                        >
+                          <UserCheck className="size-3.5 mr-1" />
+                          ตรวจสอบและกำหนดสิทธิ์ Super Admin
+                        </Button>
+                      ) : user.unit_ids && user.unit_ids.length > 0 ? (
                         <Button
                           size="sm"
                           className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
@@ -301,18 +316,7 @@ function AdminUsersPage() {
                           onClick={() => handleApprove(user)}
                         >
                           <UserCheck className="size-3.5 mr-1" />
-                          อนุมัติสิทธิ์ (
-                          {user.requested_role === "super_admin" ? "Super Admin" : "Unit Admin"})
-                        </Button>
-                      ) : user.requested_role === "super_admin" ? (
-                        <Button
-                          size="sm"
-                          className="bg-purple-600 hover:bg-purple-700 text-white font-medium shadow-xs"
-                          disabled={approveMutation.isPending}
-                          onClick={() => handleApprove(user)}
-                        >
-                          <UserCheck className="size-3.5 mr-1" />
-                          อนุมัติสิทธิ์ (Super Admin)
+                          อนุมัติสิทธิ์ (Unit Admin)
                         </Button>
                       ) : (
                         <Button

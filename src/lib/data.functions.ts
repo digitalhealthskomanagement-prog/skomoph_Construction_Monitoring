@@ -209,11 +209,11 @@ export const saveEvent = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof eventSchema>) => eventSchema.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthenticated" as const };
     
     const sb = await admin();
     const hasAccess = await verifyProjectAccess(auth, sb, "calendar_events", data.id || null, data.project_id || null, data.phase_id || null);
-    if (!hasAccess) return { ok: false as const, reason: "unauthorized" as const };
+    if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
     if (data.id) {
       const { error } = await sb.from("calendar_events").update({
@@ -231,6 +231,7 @@ export const saveEvent = createServerFn({ method: "POST" })
          const { data: p } = await sb.from("phases").select("project_id").eq("id", data.phase_id).single();
          projectId = p?.project_id;
       }
+      if (!projectId) return { ok: false as const, reason: "invalid" as const };
       const { error } = await sb.from("calendar_events").insert({
         title: data.title,
         start_date: data.start_date,
@@ -242,22 +243,22 @@ export const saveEvent = createServerFn({ method: "POST" })
       });
       if (error) throw error;
     }
-    return { ok: true };
+    return { ok: true as const };
   });
 
 export const deleteEvent = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => idInput.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthenticated" as const };
     
     const sb = await admin();
     const hasAccess = await verifyProjectAccess(auth, sb, "calendar_events", data.id);
-    if (!hasAccess) return { ok: false as const, reason: "unauthorized" as const };
+    if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
     const { error } = await sb.from("calendar_events").delete().eq("id", data.id);
     if (error) throw error;
-    return { ok: true };
+    return { ok: true as const };
   });
 
 const phaseSchema = z.object({
@@ -270,11 +271,11 @@ export const updatePhaseProgress = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof phaseSchema>) => phaseSchema.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthenticated" as const };
 
     const sb = await admin();
     const hasAccess = await verifyProjectAccess(auth, sb, "phases", data.id, data.project_id || null);
-    if (!hasAccess) return { ok: false as const, reason: "unauthorized" as const };
+    if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
     const { error } = await sb.from("phases").update({ progress: data.progress }).eq("id", data.id);
     if (error) throw error;
@@ -299,7 +300,7 @@ export const updatePhaseProgress = createServerFn({ method: "POST" })
       
       await sb.from("projects").update({ total_progress: Math.round(overall * 10) / 10, updated_at: new Date().toISOString() }).eq("id", projectId);
     }
-    return { ok: true };
+    return { ok: true as const };
   });
 
 const updateSchema = z.object({
@@ -322,7 +323,7 @@ export const createUpdateImageUpload = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof imageUploadSchema>) => imageUploadSchema.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthenticated" as const };
     // Image uploads can't easily be verified by project_id before uploading, but it's protected by login
     const sb = await admin();
     const tickets: { path: string; token: string }[] = [];
@@ -341,11 +342,11 @@ export const postUpdate = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof updateSchema>) => updateSchema.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthenticated" as const };
 
     const sb = await admin();
     const hasAccess = await verifyProjectAccess(auth, sb, null, null, data.project_id || null, data.phase_id || null);
-    if (!hasAccess) return { ok: false as const, reason: "unauthorized" as const };
+    if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
     let projectId = data.project_id;
     if (!projectId && data.phase_id) {
@@ -357,6 +358,7 @@ export const postUpdate = createServerFn({ method: "POST" })
       const { data: proj } = await sb.from("projects").select("total_progress").eq("id", projectId).maybeSingle();
       snapshot = proj?.total_progress ?? null;
     }
+    if (!projectId) return { ok: false as const, reason: "invalid" as const };
     const paths = (data.image_paths ?? (data.image_path ? [data.image_path] : [])).slice(0, 4);
     const { error } = await sb.from("updates").insert({
       title: data.title,
@@ -370,22 +372,22 @@ export const postUpdate = createServerFn({ method: "POST" })
       thumb_urls: (data.thumb_paths ?? []).slice(0, 4),
     });
     if (error) throw error;
-    return { ok: true };
+    return { ok: true as const };
   });
 
 export const deleteUpdate = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => idInput.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthenticated" as const };
     
     const sb = await admin();
     const hasAccess = await verifyProjectAccess(auth, sb, "updates", data.id);
-    if (!hasAccess) return { ok: false as const, reason: "unauthorized" as const };
+    if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
     const { error } = await sb.from("updates").delete().eq("id", data.id);
     if (error) throw error;
-    return { ok: true };
+    return { ok: true as const };
   });
 
 // ---------- Risks ----------
@@ -405,11 +407,11 @@ export const saveRisk = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof riskSchema>) => riskSchema.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthenticated" as const };
 
     const sb = await admin();
     const hasAccess = await verifyProjectAccess(auth, sb, "risks", data.id || null, data.project_id || null, data.phase_id || null);
-    if (!hasAccess) return { ok: false as const, reason: "unauthorized" as const };
+    if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
     let projectId = data.project_id;
     if (!projectId && data.phase_id) {
@@ -433,22 +435,22 @@ export const saveRisk = createServerFn({ method: "POST" })
       const { error } = await sb.from("risks").insert(payload);
       if (error) throw error;
     }
-    return { ok: true };
+    return { ok: true as const };
   });
 
 export const deleteRisk = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => idInput.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthenticated" as const };
 
     const sb = await admin();
     const hasAccess = await verifyProjectAccess(auth, sb, "risks", data.id);
-    if (!hasAccess) return { ok: false as const, reason: "unauthorized" as const };
+    if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
     const { error } = await sb.from("risks").delete().eq("id", data.id);
     if (error) throw error;
-    return { ok: true };
+    return { ok: true as const };
   });
 
 // ---------- Project settings (gated) ----------
@@ -477,11 +479,11 @@ export const saveSettings = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof settingsSchema>) => settingsSchema.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthenticated" as const };
 
     const sb = await admin();
     const hasAccess = await verifyProjectAccess(auth, sb, "projects", data.id, data.id);
-    if (!hasAccess) return { ok: false as const, reason: "unauthorized" as const };
+    if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
     const { id, ...rest } = data;
     const payload = { ...rest, updated_at: new Date().toISOString() };
@@ -506,7 +508,7 @@ export const saveUnit = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof unitSchema>) => unitSchema.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked || auth.role !== "super_admin") return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked || auth.role !== "super_admin") return { ok: false as const, reason: "forbidden" as const };
     
     const sb = await admin();
     const payload = {
@@ -533,7 +535,7 @@ export const deleteUnit = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => idInput.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked || auth.role !== "super_admin") return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked || auth.role !== "super_admin") return { ok: false as const, reason: "forbidden" as const };
     
     const sb = await admin();
     const { error } = await sb.from("units").delete().eq("id", data.id);
@@ -547,11 +549,11 @@ export const createProject = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthenticated" as const };
     
     // Only super_admin or unit_admin of that unit can create project
     if (auth.role !== "super_admin" && !auth.unitIds?.includes(data.unitId)) {
-      return { ok: false as const, reason: "unauthorized" as const };
+      return { ok: false as const, reason: "forbidden" as const };
     }
     
     const sb = await admin();
@@ -591,14 +593,14 @@ export const deleteProject = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => idInput.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthenticated" as const };
     const sb = await admin();
     
     // Check if they are super admin, or they have access to this project's unit
     if (auth.role !== "super_admin") {
       const { data: proj } = await sb.from("projects").select("unit_id").eq("id", data.id).single();
       if (!proj || !auth.unitIds?.includes(proj.unit_id)) {
-        return { ok: false as const, reason: "unauthorized" as const };
+        return { ok: false as const, reason: "forbidden" as const };
       }
     }
     const { error } = await sb.from("projects").delete().eq("id", data.id);
@@ -611,7 +613,7 @@ export const createHeroImageUpload = createServerFn({ method: "POST" })
   .inputValidator((d: { ext: string }) => z.object({ ext: z.string().max(10) }).parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthenticated" as const };
     
     const sb = await admin();
     const clean = (data.ext || "jpg").replace(/[^a-z0-9]/gi, "").toLowerCase();
@@ -641,11 +643,11 @@ export const savePhase = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof phaseUpsertSchema>) => phaseUpsertSchema.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthenticated" as const };
 
     const sb = await admin();
     const hasAccess = await verifyProjectAccess(auth, sb, "phases", data.id || null, data.project_id || null);
-    if (!hasAccess) return { ok: false as const, reason: "unauthorized" as const };
+    if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
     const payload = {
       name: data.name,
@@ -672,11 +674,11 @@ export const deletePhase = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => idInput.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthenticated" as const };
 
     const sb = await admin();
     const hasAccess = await verifyProjectAccess(auth, sb, "phases", data.id);
-    if (!hasAccess) return { ok: false as const, reason: "unauthorized" as const };
+    if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
     await sb.from("calendar_events").update({ phase_id: null }).eq("phase_id", data.id);
     await sb.from("updates").update({ phase_id: null }).eq("phase_id", data.id);
@@ -690,12 +692,12 @@ export const reorderPhases = createServerFn({ method: "POST" })
   .inputValidator((d: { ids: string[] }) => z.object({ ids: z.array(z.string().uuid()).max(200) }).parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked) return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked) return { ok: false as const, reason: "unauthenticated" as const };
 
     const sb = await admin();
     for (const id of data.ids) {
       const hasAccess = await verifyProjectAccess(auth, sb, "phases", id);
-      if (!hasAccess) return { ok: false as const, reason: "unauthorized" as const };
+      if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
     }
 
     await Promise.all(data.ids.map((id, i) => sb.from("phases").update({ order: i }).eq("id", id)));
@@ -719,7 +721,7 @@ export const saveResourceLink = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const auth = await getAuth();
     // Only super_admin can modify global resource links
-    if (!auth.unlocked || auth.role !== "super_admin") return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked || auth.role !== "super_admin") return { ok: false as const, reason: "forbidden" as const };
 
     const sb = await admin();
     const payload = {
@@ -743,7 +745,7 @@ export const deleteResourceLink = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => idInput.parse(d))
   .handler(async ({ data }) => {
     const auth = await getAuth();
-    if (!auth.unlocked || auth.role !== "super_admin") return { ok: false as const, reason: "unauthorized" as const };
+    if (!auth.unlocked || auth.role !== "super_admin") return { ok: false as const, reason: "forbidden" as const };
 
     const sb = await admin();
     const { error } = await sb.from("resource_links").delete().eq("id", data.id);

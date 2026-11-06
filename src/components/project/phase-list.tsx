@@ -10,6 +10,7 @@ import { formatThaiDate } from "@/lib/thai-date";
 import { CalendarDays, ClipboardList, HardHat, AlertTriangle } from "lucide-react";
 import { RiskDialog, type Risk } from "./risk-dialog";
 import { planPctForPhaseNow } from "@/lib/s-curve";
+import { mutationErrorMessage } from "@/lib/mutation-error";
 
 type Phase = {
   id: string;
@@ -212,7 +213,7 @@ function PhaseRow({
     }
     const result = await update({ data: { id: p.id, progress: v } });
     if (!result.ok) {
-      toast.error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง");
+      toast.error(mutationErrorMessage(result.reason));
       return;
     }
     toast.success("บันทึกความคืบหน้าแล้ว");
