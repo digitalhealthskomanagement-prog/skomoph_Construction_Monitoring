@@ -15,7 +15,9 @@ function cookieOptions() {
   return {
     httpOnly: true,
     secure: isHttps,
-    sameSite: (isHttps ? "none" : "lax") as "none" | "lax",
+    // Lax: the cookie is only needed on same-site requests (the app calls its own
+    // server functions). "none" would also send it on cross-site requests.
+    sameSite: "lax" as const,
     path: "/",
   };
 }

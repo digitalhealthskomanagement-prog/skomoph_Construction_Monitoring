@@ -32,6 +32,7 @@ import { ImagePlus, Plus, Save, Trash2, ShieldCheck, Building2, Eye, EyeOff, X, 
 
 import { z } from "zod";
 import { mutationErrorMessage } from "@/lib/mutation-error";
+import { useConfirm } from "@/components/confirm-dialog";
 
 const settingsSearchSchema = z.object({
   projectId: z.string().uuid().optional(),
@@ -172,6 +173,7 @@ function UnitDashboard({ unitId }: { unitId: string }) {
 
   const create = useServerFn(createProject);
   const remove = useServerFn(deleteProject);
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const [busy, setBusy] = useState<string | false>(false);
 
@@ -191,7 +193,12 @@ function UnitDashboard({ unitId }: { unitId: string }) {
 
   const handleDeleteProject = async (e: React.MouseEvent, projectId: string, title: string) => {
     e.stopPropagation();
-    if (!window.confirm(`ยืนยันการลบโครงการ "${title}"?`)) return;
+    const ok = await confirm({
+      title: `ลบโครงการ "${title}"?`,
+      description: "เฟสงาน ปฏิทิน รายงาน และความเสี่ยงทั้งหมดของโครงการนี้จะถูกลบไปด้วย และกู้คืนไม่ได้",
+      confirmText: "ลบโครงการ",
+    });
+    if (!ok) return;
     setBusy(projectId);
     try {
       const r = await remove({ data: { id: projectId } });
@@ -337,6 +344,7 @@ function SuperAdminUnitList({ onSelectUnit }: { onSelectUnit: (id: string) => vo
 
   const saveUnitFn = useServerFn(saveUnit);
   const deleteUnitFn = useServerFn(deleteUnit);
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const [busy, setBusy] = useState<string | null>(null);
   const [newUnit, setNewUnit] = useState({ name: "", type: "รพ.", district: "", province: "สระแก้ว" });
@@ -362,7 +370,18 @@ function SuperAdminUnitList({ onSelectUnit }: { onSelectUnit: (id: string) => vo
   }
 
   async function handleDelete(id: string, name: string) {
-    if (!window.confirm(`ยืนยันการลบหน่วยบริการ: "${name}" ? โครงการทั้งหมดภายในหน่วยบริการนี้จะถูกลบไปด้วย!`)) return;
+    const ok = await confirm({
+      title: `ลบหน่วยบริการ "${name}"?`,
+      description: (
+        <p>
+          <strong className="text-destructive">โครงการทั้งหมดของหน่วยบริการนี้จะถูกลบไปด้วย</strong>{" "}
+          รวมถึงเฟสงาน ปฏิทิน รายงาน และสิทธิ์ของเจ้าหน้าที่ในหน่วยนี้ การลบนี้กู้คืนไม่ได้
+        </p>
+      ),
+      confirmText: "ลบหน่วยบริการ",
+      requireText: name,
+    });
+    if (!ok) return;
     setBusy(id);
     try {
       const r = await deleteUnitFn({ data: { id } });

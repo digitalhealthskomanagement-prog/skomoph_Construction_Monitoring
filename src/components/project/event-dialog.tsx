@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { ymd } from "@/lib/thai-date";
 import type { CalEvent } from "./calendar-grid";
 import { mutationErrorMessage } from "@/lib/mutation-error";
+import { useConfirm } from "@/components/confirm-dialog";
 
 const TYPES = [
   { v: "task", l: "งาน" },
@@ -36,6 +37,7 @@ export function EventDialog({
   projectId: string;
 }) {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const save = useServerFn(saveEvent);
   const del = useServerFn(deleteEvent);
   const [title, setTitle] = useState("");
@@ -89,7 +91,7 @@ export function EventDialog({
 
   async function onDelete() {
     if (!event) return;
-    if (!confirm("ลบรายการนี้?")) return;
+    if (!(await confirm({ title: `ลบรายการ "${event.title}"?`, description: "ลบออกจากปฏิทินแล้วกู้คืนไม่ได้" }))) return;
     const result = await del({ data: { id: event.id } });
     if (!result.ok) {
       toast.error(mutationErrorMessage(result.reason));

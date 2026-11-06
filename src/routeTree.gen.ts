@@ -14,6 +14,7 @@ import { Route as GuideRouteImport } from './routes/guide'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as AdminAuditRouteImport } from './routes/admin/audit'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
 
@@ -42,6 +43,11 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminAuditRoute = AdminAuditRouteImport.update({
+  id: '/admin/audit',
+  path: '/admin/audit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/admin/users',
   path: '/admin/users',
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
+  '/admin/audit': typeof AdminAuditRoute
   '/admin/users': typeof AdminUsersRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
 }
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
+  '/admin/audit': typeof AdminAuditRoute
   '/admin/users': typeof AdminUsersRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
 }
@@ -78,6 +86,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/settings': typeof SettingsRoute
+  '/admin/audit': typeof AdminAuditRoute
   '/admin/users': typeof AdminUsersRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
 }
@@ -89,6 +98,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/settings'
+    | '/admin/audit'
     | '/admin/users'
     | '/projects/$projectId'
   fileRoutesByTo: FileRoutesByTo
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/settings'
+    | '/admin/audit'
     | '/admin/users'
     | '/projects/$projectId'
   id:
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/settings'
+    | '/admin/audit'
     | '/admin/users'
     | '/projects/$projectId'
   fileRoutesById: FileRoutesById
@@ -117,6 +129,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
   SettingsRoute: typeof SettingsRoute
+  AdminAuditRoute: typeof AdminAuditRoute
   AdminUsersRoute: typeof AdminUsersRoute
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
 }
@@ -158,6 +171,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/audit': {
+      id: '/admin/audit'
+      path: '/admin/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AdminAuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/users': {
       id: '/admin/users'
       path: '/admin/users'
@@ -181,6 +201,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   SettingsRoute: SettingsRoute,
+  AdminAuditRoute: AdminAuditRoute,
   AdminUsersRoute: AdminUsersRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRoute,
 }

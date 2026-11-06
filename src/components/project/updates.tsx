@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { ImagePlus, Send, Trash2, X } from "lucide-react";
 import { formatThaiDate } from "@/lib/thai-date";
 import { mutationErrorMessage } from "@/lib/mutation-error";
+import { useConfirm } from "@/components/confirm-dialog";
 
 const MAX_IMAGES = 4;
 
@@ -278,13 +279,14 @@ function previewsOf(u: Update): { thumb: string; full: string }[] {
 
 export function UpdatesList({ updates, phases, editable }: { updates: Update[]; phases: Phase[]; editable: boolean }) {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const del = useServerFn(deleteUpdate);
   const [zoom, setZoom] = useState<string | null>(null);
   const phaseName = (id: string | null) => phases.find((p) => p.id === id)?.name;
 
 
   async function onDelete(id: string) {
-    if (!confirm("ลบโพสต์นี้?")) return;
+    if (!(await confirm({ title: "ลบรายงานนี้?", description: "รายงานและรูปที่แนบจะไม่แสดงอีก และกู้คืนไม่ได้" }))) return;
     const result = await del({ data: { id } });
     if (!result.ok) {
       toast.error(mutationErrorMessage(result.reason));

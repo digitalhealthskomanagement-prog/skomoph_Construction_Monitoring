@@ -34,6 +34,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ShieldCheck, UserCheck, Clock, UserX, Search } from "lucide-react";
+import { useConfirm } from "@/components/confirm-dialog";
 
 interface AdminUser {
   id: string;
@@ -63,6 +64,7 @@ export const Route = createFileRoute("/admin/users")({
 
 function AdminUsersPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
@@ -149,10 +151,15 @@ function AdminUsersPage() {
     });
   };
 
-  const handleDelete = (userId: string) => {
-    if (confirm("คุณแน่ใจหรือไม่ว่าต้องการลบผู้ใช้งานนี้? การกระทำนี้ไม่สามารถยกเลิกได้")) {
-      deleteMutation.mutate({ userId });
-    }
+  const handleDelete = async (userId: string) => {
+    const user = usersData?.users.find((u) => u.id === userId);
+    const label = user?.email || user?.full_name || "ผู้ใช้นี้";
+    const ok = await confirm({
+      title: `ลบบัญชี ${label}?`,
+      description: "บัญชีและสิทธิ์ทั้งหมดของผู้ใช้นี้จะถูกลบ และกู้คืนไม่ได้ ผู้ใช้ต้องลงทะเบียนใหม่หากต้องการใช้งานอีก",
+      confirmText: "ลบผู้ใช้",
+    });
+    if (ok) deleteMutation.mutate({ userId });
   };
 
   const openEditDialog = (user: AdminUser) => {

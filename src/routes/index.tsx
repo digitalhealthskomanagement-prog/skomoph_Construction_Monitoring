@@ -51,11 +51,11 @@ function DashboardComponent() {
 
   // --- Prepare Chart Data ---
   // 1. Projects by District
-  const districtCounts = activeProjects.reduce((acc, p) => {
+  const districtCounts = activeProjects.reduce<Record<string, number>>((acc, p) => {
     const d = p.district || "ไม่ระบุ";
     acc[d] = (acc[d] || 0) + 1;
     return acc;
-  }, {} as Record<string, number>);
+  }, {});
   const barChartData = Object.entries(districtCounts)
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count);
@@ -76,11 +76,11 @@ function DashboardComponent() {
   ].filter((d) => d.value > 0);
 
   // 3. Project Budget Source
-  const budgetSourceCounts = activeProjects.reduce((acc, p) => {
+  const budgetSourceCounts = activeProjects.reduce<Record<string, number>>((acc, p) => {
     const s = p.budget_source || "ไม่ระบุ";
     acc[s] = (acc[s] || 0) + 1;
     return acc;
-  }, {} as Record<string, number>);
+  }, {});
   const budgetPieData = Object.entries(budgetSourceCounts).map(([name, value], i) => ({
     name,
     value,

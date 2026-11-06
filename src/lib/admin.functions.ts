@@ -178,6 +178,14 @@ export const approveUser = createServerFn({ method: "POST" })
       },
     });
 
+    const { writeAudit } = await import("./audit.server");
+    await writeAudit(supabaseAdmin, ctx.userId, {
+      action: "approve",
+      entity: "user",
+      entityId: data.userId,
+      summary: `${existingUser?.user?.email ?? data.userId} → ${data.role}`,
+      details: { role: data.role, unit_id: data.unitId ?? null },
+    });
     return { success: true };
   });
 
@@ -243,6 +251,14 @@ export const updateUserRole = createServerFn({ method: "POST" })
       },
     });
 
+    const { writeAudit } = await import("./audit.server");
+    await writeAudit(supabaseAdmin, ctx.userId, {
+      action: "role_change",
+      entity: "user",
+      entityId: data.userId,
+      summary: `${existingUser?.user?.email ?? data.userId} → ${data.role}`,
+      details: { role: data.role, unit_ids: data.unitIds },
+    });
     return { success: true };
   });
 
@@ -253,10 +269,64 @@ export const deleteUser = createServerFn({ method: "POST" })
     const ctx = await requireSuperAdmin();
     await assertNotRemovingSuperAdmin(supabaseAdmin, ctx.userId, data.userId, null);
 
+    const { data: target } = await supabaseAdmin.auth.admin.getUserById(data.userId);
+    const deletedEmail = target?.user?.email;
     const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
     if (error) throw dbError(error);
     // user_roles.user_id has no foreign key to auth.users, so remove the rows here
     await supabaseAdmin.from("user_roles").delete().eq("user_id", data.userId);
 
+    const { writeAudit } = await import("./audit.server");
+    await writeAudit(supabaseAdmin, ctx.userId, {
+      action: "delete",
+      entity: "user",
+      entityId: data.userId,
+      summary: deletedEmail ?? data.userId,
+      details: { email: deletedEmail ?? null },
+    });
     return { success: true };
+  });
+
+
+export const getAuditLog = createServerFn({ method: "GET" })
+  .inputValidator(
+    z.object({
+      limit: z.number().int().min(1).max(500).default(200),
+      projectId: z.string().uuid().optional(),
+      before: z.number().int().optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await requireSuperAdmin();
+
+    let q = supabaseAdmin
+      .from("audit_log")
+      .select("id, created_at, actor_id, action, entity, entity_id, project_id, summary, details")
+      .order("id", { ascending: false })
+      .limit(data.limit);
+    if (data.projectId) q = q.eq("project_id", data.projectId);
+    if (data.before) q = q.lt("id", data.before);
+    const { data: rows, error } = await q;
+    if (error) throw dbError(error, "getAuditLog");
+
+    const projectIds = [...new Set((rows ?? []).map((r) => r.project_id).filter(Boolean))] as string[];
+    const [users, projectsRes] = await Promise.all([
+      listAllAuthUsers(supabaseAdmin),
+      projectIds.length
+        ? supabaseAdmin.from("projects").select("id, title").in("id", projectIds)
+        : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+    ]);
+    const emailById = new Map(users.map((u) => [u.id, u.email ?? ""]));
+    const titleById = new Map((projectsRes.data ?? []).map((p) => [p.id, p.title]));
+
+    return {
+      rows: (rows ?? []).map((r) => ({
+        ...r,
+        // Sent as a JSON string: server-function results must be plain serializable types
+        details: r.details == null ? null : JSON.stringify(r.details),
+        actor_email: r.actor_id ? (emailById.get(r.actor_id) ?? "(ผู้ใช้ที่ถูกลบ)") : "-",
+        project_title: r.project_id ? (titleById.get(r.project_id) ?? null) : null,
+      })),
+    };
   });

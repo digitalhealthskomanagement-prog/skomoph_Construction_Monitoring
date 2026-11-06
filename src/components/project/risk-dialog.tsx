@@ -10,6 +10,7 @@ import { saveRisk, deleteRisk } from "@/lib/data.functions";
 import { toast } from "sonner";
 import { AlertTriangle, Trash2, Plus, Pencil } from "lucide-react";
 import { mutationErrorMessage } from "@/lib/mutation-error";
+import { useConfirm } from "@/components/confirm-dialog";
 
 export type Risk = {
   id: string;
@@ -45,6 +46,7 @@ export function RiskDialog({
   editable: boolean;
 }) {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const save = useServerFn(saveRisk);
   const del = useServerFn(deleteRisk);
   const [editing, setEditing] = useState<Risk | null>(null);
@@ -73,7 +75,7 @@ export function RiskDialog({
   }
 
   async function remove(id: string) {
-    if (!confirm("ลบรายการนี้?")) return;
+    if (!(await confirm({ title: "ลบความเสี่ยงนี้?", description: "ลบแล้วกู้คืนไม่ได้" }))) return;
     const res = await del({ data: { id } });
     if (!res.ok) {
       toast.error(mutationErrorMessage(res.reason));

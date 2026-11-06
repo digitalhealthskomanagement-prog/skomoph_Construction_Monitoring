@@ -17,6 +17,18 @@ async function admin() {
 const storagePath = z.string().regex(/^(hero\/)?\d+-[a-z0-9]{1,8}\.(jpg|png)$/);
 const idInput = z.object({ id: z.string().uuid() });
 
+// Audit log helpers (implementation in audit.server.ts, loaded only on the server)
+type AuditInput = import("./audit.server").AuditEntry;
+type SnapTable = Parameters<typeof import("./audit.server").snapshotRow>[1];
+async function audit(auth: { userId?: string }, entry: AuditInput) {
+  const { writeAudit } = await import("./audit.server");
+  await writeAudit(await admin(), auth.userId, entry);
+}
+async function snap(table: SnapTable, id: string) {
+  const { snapshotRow } = await import("./audit.server");
+  return snapshotRow(await admin(), table, id);
+}
+
 // YYYY-MM-DD for "today" in Thailand, regardless of the server's time zone
 function bangkokToday(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
@@ -105,7 +117,7 @@ export const getAllProjectsData = createServerFn({ method: "GET" }).handler(asyn
         .limit(2000);
       if (photoError) console.error("getAllProjectsData photos error:", photoError);
       for (const u of photoUpdates ?? []) {
-        if (!latestPhoto.has(u.project_id)) {
+        if (u.project_id && !latestPhoto.has(u.project_id)) {
           // Prefer the small thumbnail for the card grid when one exists
           const thumbs = (u as { thumb_urls?: string[] | null }).thumb_urls;
           latestPhoto.set(u.project_id, {
@@ -253,6 +265,7 @@ export const saveEvent = createServerFn({ method: "POST" })
     const hasAccess = await verifyProjectAccess(auth, sb, "calendar_events", data.id || null, data.project_id || null, data.phase_id || null);
     if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
+    const before = data.id ? await snap("calendar_events", data.id) : null;
     if (data.id) {
       const { error } = await sb.from("calendar_events").update({
         title: data.title,
@@ -267,7 +280,7 @@ export const saveEvent = createServerFn({ method: "POST" })
       let projectId = data.project_id;
       if (!projectId && data.phase_id) {
          const { data: p } = await sb.from("phases").select("project_id").eq("id", data.phase_id).single();
-         projectId = p?.project_id;
+         projectId = p?.project_id ?? undefined;
       }
       if (!projectId) return { ok: false as const, reason: "invalid" as const };
       const { error } = await sb.from("calendar_events").insert({
@@ -281,6 +294,14 @@ export const saveEvent = createServerFn({ method: "POST" })
       });
       if (error) throw dbError(error);
     }
+    await audit(auth, {
+      action: data.id ? "update" : "create",
+      entity: "calendar_event",
+      entityId: data.id ?? null,
+      projectId: (before?.project_id as string | undefined) ?? data.project_id ?? null,
+      summary: data.title,
+      details: { start_date: data.start_date, end_date: data.end_date, type: data.type },
+    });
     return { ok: true as const };
   });
 
@@ -294,8 +315,17 @@ export const deleteEvent = createServerFn({ method: "POST" })
     const hasAccess = await verifyProjectAccess(auth, sb, "calendar_events", data.id);
     if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
+    const before = await snap("calendar_events", data.id);
     const { error } = await sb.from("calendar_events").delete().eq("id", data.id);
     if (error) throw dbError(error);
+    await audit(auth, {
+      action: "delete",
+      entity: "calendar_event",
+      entityId: data.id,
+      projectId: (before?.project_id as string | undefined) ?? null,
+      summary: (before?.title as string | undefined) ?? null,
+      details: { before },
+    });
     return { ok: true as const };
   });
 
@@ -315,15 +345,24 @@ export const updatePhaseProgress = createServerFn({ method: "POST" })
     const hasAccess = await verifyProjectAccess(auth, sb, "phases", data.id, data.project_id || null);
     if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
+    const before = await snap("phases", data.id);
     const { error } = await sb.from("phases").update({ progress: data.progress }).eq("id", data.id);
     if (error) throw dbError(error);
 
     let projectId = data.project_id;
     if (!projectId) {
       const { data: p } = await sb.from("phases").select("project_id").eq("id", data.id).single();
-      projectId = p?.project_id;
+      projectId = p?.project_id ?? undefined;
     }
-    if (!projectId) return { ok: true };
+    await audit(auth, {
+      action: "progress",
+      entity: "phase",
+      entityId: data.id,
+      projectId: (before?.project_id as string | undefined) ?? projectId ?? null,
+      summary: `${(before?.name as string | undefined) ?? "เฟสงาน"}: ${before?.progress ?? "?"}% → ${data.progress}%`,
+      details: { from: before?.progress ?? null, to: data.progress },
+    });
+    if (!projectId) return { ok: true as const };
 
     const { data: phases } = await sb.from("phases").select("progress, category, weight").eq("project_id", projectId);
     if (phases && phases.length > 0) {
@@ -389,7 +428,7 @@ export const postUpdate = createServerFn({ method: "POST" })
     let projectId = data.project_id;
     if (!projectId && data.phase_id) {
       const { data: p } = await sb.from("phases").select("project_id").eq("id", data.phase_id).single();
-      projectId = p?.project_id;
+      projectId = p?.project_id ?? undefined;
     }
     let snapshot = data.progress_snapshot;
     if (snapshot == null && projectId) {
@@ -410,6 +449,13 @@ export const postUpdate = createServerFn({ method: "POST" })
       thumb_urls: (data.thumb_paths ?? []).slice(0, 4),
     });
     if (error) throw dbError(error);
+    await audit(auth, {
+      action: "create",
+      entity: "update",
+      projectId,
+      summary: data.title,
+      details: { images: paths.length, phase_id: data.phase_id ?? null },
+    });
     return { ok: true as const };
   });
 
@@ -423,8 +469,17 @@ export const deleteUpdate = createServerFn({ method: "POST" })
     const hasAccess = await verifyProjectAccess(auth, sb, "updates", data.id);
     if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
+    const before = await snap("updates", data.id);
     const { error } = await sb.from("updates").delete().eq("id", data.id);
     if (error) throw dbError(error);
+    await audit(auth, {
+      action: "delete",
+      entity: "update",
+      entityId: data.id,
+      projectId: (before?.project_id as string | undefined) ?? null,
+      summary: (before?.title as string | undefined) ?? null,
+      details: { before },
+    });
     return { ok: true as const };
   });
 
@@ -454,7 +509,7 @@ export const saveRisk = createServerFn({ method: "POST" })
     let projectId = data.project_id;
     if (!projectId && data.phase_id) {
        const { data: p } = await sb.from("phases").select("project_id").eq("id", data.phase_id).single();
-       projectId = p?.project_id;
+       projectId = p?.project_id ?? undefined;
     }
     const payload = {
       phase_id: data.phase_id,
@@ -473,6 +528,14 @@ export const saveRisk = createServerFn({ method: "POST" })
       const { error } = await sb.from("risks").insert(payload);
       if (error) throw dbError(error);
     }
+    await audit(auth, {
+      action: data.id ? "update" : "create",
+      entity: "risk",
+      entityId: data.id ?? null,
+      projectId: projectId ?? null,
+      summary: data.title,
+      details: { severity: data.severity, status: data.status },
+    });
     return { ok: true as const };
   });
 
@@ -486,8 +549,17 @@ export const deleteRisk = createServerFn({ method: "POST" })
     const hasAccess = await verifyProjectAccess(auth, sb, "risks", data.id);
     if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
+    const before = await snap("risks", data.id);
     const { error } = await sb.from("risks").delete().eq("id", data.id);
     if (error) throw dbError(error);
+    await audit(auth, {
+      action: "delete",
+      entity: "risk",
+      entityId: data.id,
+      projectId: (before?.project_id as string | undefined) ?? null,
+      summary: (before?.title as string | undefined) ?? null,
+      details: { before },
+    });
     return { ok: true as const };
   });
 
@@ -523,10 +595,24 @@ export const saveSettings = createServerFn({ method: "POST" })
     const hasAccess = await verifyProjectAccess(auth, sb, "projects", data.id, data.id);
     if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
+    const before = await snap("projects", data.id);
     const { id, ...rest } = data;
     const payload = { ...rest, updated_at: new Date().toISOString() };
     const { error } = await sb.from("projects").update(payload).eq("id", id);
     if (error) throw dbError(error);
+    const changed: Record<string, { from: unknown; to: unknown }> = {};
+    for (const [k, v] of Object.entries(rest)) {
+      const old = before?.[k] ?? null;
+      if (String(old ?? "") !== String(v ?? "")) changed[k] = { from: old, to: v ?? null };
+    }
+    await audit(auth, {
+      action: "update",
+      entity: "project",
+      entityId: id,
+      projectId: id,
+      summary: data.title,
+      details: { changed },
+    });
     return { ok: true as const };
   });
 
@@ -566,6 +652,13 @@ export const saveUnit = createServerFn({ method: "POST" })
       const { error } = await sb.from("units").insert(payload);
       if (error) throw dbError(error);
     }
+    await audit(auth, {
+      action: data.id ? "update" : "create",
+      entity: "unit",
+      entityId: data.id ?? null,
+      summary: data.name,
+      details: { type: data.type ?? null, district: data.district ?? null },
+    });
     return { ok: true as const };
   });
 
@@ -576,8 +669,17 @@ export const deleteUnit = createServerFn({ method: "POST" })
     if (!auth.unlocked || auth.role !== "super_admin") return { ok: false as const, reason: "forbidden" as const };
     
     const sb = await admin();
+    const before = await snap("units", data.id);
     const { error } = await sb.from("units").delete().eq("id", data.id);
     if (error) throw dbError(error);
+    await audit(auth, {
+      action: "delete",
+      entity: "unit",
+      entityId: data.id,
+      projectId: null,
+      summary: (before?.name as string | undefined) ?? null,
+      details: { before },
+    });
     return { ok: true as const };
   });
 
@@ -647,6 +749,14 @@ export const createProject = createServerFn({ method: "POST" })
     const { error: phaseError } = await sb.from("phases").insert(defaultPhases);
     if (phaseError) throw dbError(phaseError);
 
+    await audit(auth, {
+      action: "create",
+      entity: "project",
+      entityId: proj.id,
+      projectId: proj.id,
+      summary: data.title,
+      details: { unit_id: data.unitId },
+    });
     return { ok: true as const };
   });
 
@@ -660,12 +770,21 @@ export const deleteProject = createServerFn({ method: "POST" })
     // Check if they are super admin, or they have access to this project's unit
     if (auth.role !== "super_admin") {
       const { data: proj } = await sb.from("projects").select("unit_id").eq("id", data.id).single();
-      if (!proj || !auth.unitIds?.includes(proj.unit_id)) {
+      if (!proj?.unit_id || !auth.unitIds?.includes(proj.unit_id)) {
         return { ok: false as const, reason: "forbidden" as const };
       }
     }
+    const before = await snap("projects", data.id);
     const { error } = await sb.from("projects").delete().eq("id", data.id);
     if (error) throw dbError(error);
+    await audit(auth, {
+      action: "delete",
+      entity: "project",
+      entityId: data.id,
+      projectId: data.id,
+      summary: (before?.title as string | undefined) ?? null,
+      details: { before },
+    });
     return { ok: true as const };
   });
 
@@ -728,6 +847,14 @@ export const savePhase = createServerFn({ method: "POST" })
       const { error } = await sb.from("phases").insert(payload);
       if (error) throw dbError(error);
     }
+    await audit(auth, {
+      action: data.id ? "update" : "create",
+      entity: "phase",
+      entityId: data.id ?? null,
+      projectId: data.project_id ?? null,
+      summary: data.name,
+      details: { progress: data.progress, weight: data.weight ?? null, category: data.category },
+    });
     return { ok: true as const };
   });
 
@@ -741,11 +868,20 @@ export const deletePhase = createServerFn({ method: "POST" })
     const hasAccess = await verifyProjectAccess(auth, sb, "phases", data.id);
     if (!hasAccess) return { ok: false as const, reason: "forbidden" as const };
 
+    const before = await snap("phases", data.id);
     await sb.from("calendar_events").update({ phase_id: null }).eq("phase_id", data.id);
     await sb.from("updates").update({ phase_id: null }).eq("phase_id", data.id);
     await sb.from("risks").delete().eq("phase_id", data.id);
     const { error } = await sb.from("phases").delete().eq("id", data.id);
     if (error) throw dbError(error);
+    await audit(auth, {
+      action: "delete",
+      entity: "phase",
+      entityId: data.id,
+      projectId: (before?.project_id as string | undefined) ?? null,
+      summary: (before?.name as string | undefined) ?? null,
+      details: { before },
+    });
     return { ok: true as const };
   });
 
@@ -762,6 +898,12 @@ export const reorderPhases = createServerFn({ method: "POST" })
     }
 
     await Promise.all(data.ids.map((id, i) => sb.from("phases").update({ order: i }).eq("id", id)));
+    await audit(auth, {
+      action: "reorder",
+      entity: "phase",
+      summary: `จัดลำดับเฟสงานใหม่ ${data.ids.length} รายการ`,
+      details: { ids: data.ids },
+    });
     return { ok: true as const };
   });
 
@@ -799,6 +941,13 @@ export const saveResourceLink = createServerFn({ method: "POST" })
       const { error } = await sb.from("resource_links").insert(payload);
       if (error) throw dbError(error);
     }
+    await audit(auth, {
+      action: data.id ? "update" : "create",
+      entity: "resource_link",
+      entityId: data.id ?? null,
+      summary: data.label,
+      details: { url: data.url },
+    });
     return { ok: true as const };
   });
 
@@ -809,7 +958,16 @@ export const deleteResourceLink = createServerFn({ method: "POST" })
     if (!auth.unlocked || auth.role !== "super_admin") return { ok: false as const, reason: "forbidden" as const };
 
     const sb = await admin();
+    const before = await snap("resource_links", data.id);
     const { error } = await sb.from("resource_links").delete().eq("id", data.id);
     if (error) throw dbError(error);
+    await audit(auth, {
+      action: "delete",
+      entity: "resource_link",
+      entityId: data.id,
+      projectId: null,
+      summary: (before?.label as string | undefined) ?? null,
+      details: { before },
+    });
     return { ok: true as const };
   });
