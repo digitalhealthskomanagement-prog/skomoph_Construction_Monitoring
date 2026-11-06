@@ -13,6 +13,8 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthStatus, setSessionCookie } from "@/lib/auth.functions";
+import { AUTH_STATUS_QUERY_KEY } from "@/hooks/use-auth-status";
 
 function NotFoundComponent() {
   return (
@@ -124,20 +126,28 @@ function RootComponent() {
         return;
       }
 
-      // 2. Check if user is logged into Supabase Auth but has not submitted registration
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) {
-          const meta = session.user.user_metadata || {};
-          const isApproved = meta.is_approved === true;
-          const hasSubmitted = Boolean(meta.unit_id || meta.registration_completed);
-
-          if (!isApproved && !hasSubmitted && pathname !== "/register" && pathname !== "/login") {
+      // 2. Signed in to Supabase but the server session is missing, expired or belongs to
+      // someone else: let the server decide from user_roles (not user_metadata, which
+      // the user can edit). Approved users get their session restored; users who never
+      // registered are sent to /register.
+      if (pathname === "/register" || pathname === "/login") return;
+      supabase.auth.getSession().then(async ({ data: { session } }) => {
+        if (!session?.user) return;
+        try {
+          const status = await getAuthStatus();
+          if (status.unlocked && status.userId === session.user.id) return;
+          const res = await setSessionCookie({ data: { access_token: session.access_token } });
+          if (res.ok) {
+            await queryClient.invalidateQueries({ queryKey: AUTH_STATUS_QUERY_KEY });
+          } else if ("needsProfile" in res && res.needsProfile) {
             window.location.replace("/register");
           }
+        } catch (err) {
+          console.error("Auth session sync failed:", err);
         }
       });
     }
-  }, []);
+  }, [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

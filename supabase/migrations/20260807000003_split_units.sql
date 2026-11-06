@@ -11,6 +11,10 @@ CREATE TABLE IF NOT EXISTS public.units (
   updated_at timestamp with time zone DEFAULT now()
 );
 
+-- user_roles.unit_id must exist before the policies below reference it.
+-- (Originally added in step 6 / a later migration, which made a fresh replay fail.)
+ALTER TABLE public.user_roles ADD COLUMN IF NOT EXISTS unit_id uuid REFERENCES public.units(id) ON DELETE CASCADE;
+
 -- Enable RLS on units
 ALTER TABLE public.units ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public read access for units" ON public.units FOR SELECT USING (true);
@@ -23,7 +27,7 @@ CREATE POLICY "Unit admins can update their units" ON public.units FOR UPDATE US
 
 -- 2. Move distinct units from projects
 INSERT INTO public.units (id, name, type, district, province, lat, lng, created_at, updated_at)
-SELECT id, unit_name, unit_type, district, province, lat, lng, created_at, updated_at
+SELECT id, unit_name, unit_type, district, province, lat, lng, now(), updated_at  -- projects has no created_at column
 FROM public.projects
 WHERE unit_name IS NOT NULL;
 
