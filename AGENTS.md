@@ -11,9 +11,16 @@
 
 This project was remixed from a Lovable template. It is **not** connected to Lovable:
 nothing syncs back to Lovable, and the old Lovable Supabase project
-(`zfhdzasgostibilkslha`) is not used. `.lovable/` and `@lovable.dev/vite-tanstack-config`
-are template leftovers; the Vite config package is still the build config, so do not
-remove it without replacing it.
+(`zfhdzasgostibilkslha`) is not used. The only remaining template piece is
+`@lovable.dev/vite-tanstack-config`, which is still the build config, so do not remove it
+without replacing it.
+
+## Checks
+
+Run `npm run typecheck`, `npm test` (Node test runner, files in `tests/`) and
+`npm run build`. CI (`.github/workflows/ci.yml`) runs all three on every pull request.
+Keep logic that needs tests in import-free modules under `src/lib/` (see `access.ts`,
+`schedule.ts`, `report.ts`) so Node can run them without a bundler.
 
 ## Database migrations
 

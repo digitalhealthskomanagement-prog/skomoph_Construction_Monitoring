@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { dbError } from "./server-errors";
+import { verifyProjectAccess } from "./access";
+import { bangkokToday, buildPrepPhases } from "./schedule";
 
 async function getAuth() {
   const mod = await import("./auth.server");
@@ -29,52 +31,7 @@ async function snap(table: SnapTable, id: string) {
   return snapshotRow(await admin(), table, id);
 }
 
-// YYYY-MM-DD for "today" in Thailand, regardless of the server's time zone
-function bangkokToday(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
-}
 
-function addDays(isoDate: string, days: number): string {
-  const d = new Date(`${isoDate}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-// Every project the request touches must belong to the caller: the project of the
-// existing record (when updating/deleting by id) AND any project/phase given in the
-// payload. Trusting the payload alone would let a unit admin edit or move records
-// owned by other units.
-async function verifyProjectAccess(auth: any, sb: any, table: string | null, id: string | null, payloadProjectId: string | null = null, payloadPhaseId: string | null = null) {
-  if (auth.role === "super_admin") return true;
-  if (auth.role !== "unit_admin" || !auth.unitIds || auth.unitIds.length === 0) return false;
-
-  const projectIds: (string | null | undefined)[] = [];
-
-  if (id && table) {
-    if (table === "projects") {
-      projectIds.push(id);
-    } else {
-      const { data } = await sb.from(table).select("project_id").eq("id", id).maybeSingle();
-      if (!data) return false;
-      projectIds.push(data.project_id);
-    }
-  }
-
-  if (payloadProjectId) projectIds.push(payloadProjectId);
-
-  if (payloadPhaseId) {
-    const { data } = await sb.from("phases").select("project_id").eq("id", payloadPhaseId).maybeSingle();
-    if (!data) return false;
-    projectIds.push(data.project_id);
-  }
-
-  if (projectIds.length === 0 || projectIds.some((p) => !p)) return false;
-
-  const unique = [...new Set(projectIds as string[])];
-  const { data: projs } = await sb.from("projects").select("id, unit_id").in("id", unique);
-  if (!projs || projs.length !== unique.length) return false;
-  return projs.every((p: { unit_id: string }) => auth.unitIds.includes(p.unit_id));
-}
 
 async function signImage(path: string | null): Promise<string | null> {
   if (!path) return null;
@@ -696,43 +653,8 @@ export const createProject = createServerFn({ method: "POST" })
       return { ok: false as const, reason: "forbidden" as const };
     }
     
-    // Standard e-bidding preparation steps: [code, name, duration in days]. Dates are
-    // laid out back to back starting today (Thai time), instead of fixed 2026 dates.
-    const prepSteps: [string, string, number][] = [
-      ["1.1", "เสนอแต่งตั้งคณะกรรมการกำหนดขอบเขตงาน (TOR) และราคากลาง", 5],
-      ["1.2", "คณะกรรมการฯ จัดทำแบบรูปรายการและราคากลาง", 20],
-      ["1.3", "เสนอรายงานผลราคากลาง และขอความเห็นชอบ", 1],
-      ["1.4", "จัดทำรายงานขอซื้อขอจ้าง พร้อมแต่งตั้งคณะกรรมการพิจารณาผลฯ", 6],
-      ["1.5", "เผยแพร่ร่างประกาศเพื่อรับฟังคำวิจารณ์ (7 วันทำการ)", 11],
-      ["1.6", "รายงานผลรับฟังความคิดเห็น และผู้บริหารลงนามประกาศเชิญชวน", 1],
-      ["1.7", "เผยแพร่ประกาศประกวดราคา e-bidding (20 วันทำการ)", 28],
-      ["1.8", "ผู้เสนอราคายื่นข้อเสนอทางระบบอิเล็กทรอนิกส์", 1],
-      ["1.9", "คณะกรรมการพิจารณาผลการประกวดราคาฯ", 5],
-      ["1.10", "รายงานผลการพิจารณาให้ผู้มีอำนาจลงนาม", 1],
-      ["1.11", "ประกาศผู้ชนะการเสนอราคา", 1],
-      ["1.12", "เว้นระยะเวลาอุทธรณ์ (7 วันทำการ)", 11],
-      ["1.13", "รายงานผลอุทธรณ์ / เสนอผู้บริหารเรียกทำสัญญา", 1],
-      ["1.14", "ผู้รับจ้างเตรียมหลักประกัน และตรวจสอบเอกสารเพื่อลงนาม", 17],
-      ["1.15", "ผู้มีอำนาจลงนามสัญญาจ้างก่อสร้าง (เริ่มต้นนับเวลาก่อสร้าง)", 1],
-    ];
     const today = bangkokToday();
-    let cursor = today;
-    const defaultPhaseRows = prepSteps.map(([code, name, days], i) => {
-      const startDate = cursor;
-      const endDate = addDays(startDate, days - 1);
-      cursor = addDays(endDate, 1);
-      return {
-        category: "preparation",
-        code,
-        name,
-        order: 101 + i,
-        color: "#0ea5e9",
-        duration_label: `${days} วัน`,
-        start_date: startDate,
-        end_date: endDate,
-        progress: 0,
-      };
-    });
+    const defaultPhaseRows = buildPrepPhases(today);
     const lastPrepEnd = defaultPhaseRows[defaultPhaseRows.length - 1].end_date;
 
     const sb = await admin();
