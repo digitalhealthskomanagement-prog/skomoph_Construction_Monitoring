@@ -14,7 +14,8 @@ jobs:
       - name: Ping Supabase Database
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://fkfusxleqsupnlcxrcnr.supabase.co' }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_ANON_KEY || 'sb_publishable_fTY8fAS9GwiJQfvMTMXBXw_Vz_n8Omm' }}
+          # Public (publishable) key only: a keep-alive ping needs no admin rights
+          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'sb_publishable_fTY8fAS9GwiJQfvMTMXBXw_Vz_n8Omm' }}
         run: |
           echo "==============================================="
           echo "Sending keep-alive ping to Supabase Database..."
@@ -28,11 +29,10 @@ jobs:
 
           echo "Supabase Auth Health HTTP Status: $AUTH_STATUS"
 
-          # Ping Supabase REST API Service
+          # Run a real (public, read-only) database query so the project counts as active
           REST_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "apikey: $SUPABASE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_KEY" \
-            "$SUPABASE_URL/rest/v1/")
+            "$SUPABASE_URL/rest/v1/units?select=id&limit=1")
 
           echo "Supabase REST API HTTP Status: $REST_STATUS"
 

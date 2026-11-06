@@ -64,4 +64,4 @@ src/
 ## 4. กฎและข้อควรระวังสำคัญ (Guidelines for Future Maintenance)
 1. **การปรับแต่งหน้าภาพรวมจังหวัดสระแก้ว:** ให้แก้ไขใน `src/components/province/` และ `src/routes/index.tsx`
 2. **การปรับแต่งหน้ารายละเอียดของแต่ละโครงการ:** ให้แก้ไขใน `src/components/project/` และ `src/routes/projects/$projectId.tsx`
-3. **การ Deploy:** ทำผ่านคำสั่ง `git push` ขึ้น GitHub `main` ซึ่งจะทำการ Deploy ไปยัง Vercel อัตโนมัติ (ห้ามใช้ force push เนื่องจากเชื่อมต่อกับ Lovable)
+3. **การ Deploy:** ทำผ่านคำสั่ง `git push` ขึ้น GitHub `main` ซึ่งจะทำการ Deploy ไปยัง Vercel อัตโนมัติ ทุก Pull Request จะรัน CI (ตรวจ type, unit test, build) ก่อน merge และหากมีไฟล์ใหม่ใน `supabase/migrations/` ต้องรัน SQL ใน Supabase เองเพราะ Vercel ไม่รันให้

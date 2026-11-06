@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as GuideRouteImport } from './routes/guide'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as ReportRouteImport } from './routes/report'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as AdminAuditRouteImport } from './routes/admin/audit'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
@@ -36,6 +37,11 @@ const LoginRoute = LoginRouteImport.update({
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportRoute = ReportRouteImport.update({
+  id: '/report',
+  path: '/report',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/guide': typeof GuideRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/report': typeof ReportRoute
   '/settings': typeof SettingsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/users': typeof AdminUsersRoute
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/guide': typeof GuideRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/report': typeof ReportRoute
   '/settings': typeof SettingsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/users': typeof AdminUsersRoute
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/guide': typeof GuideRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/report': typeof ReportRoute
   '/settings': typeof SettingsRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/users': typeof AdminUsersRoute
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/guide'
     | '/login'
     | '/register'
+    | '/report'
     | '/settings'
     | '/admin/audit'
     | '/admin/users'
@@ -107,6 +117,7 @@ export interface FileRouteTypes {
     | '/guide'
     | '/login'
     | '/register'
+    | '/report'
     | '/settings'
     | '/admin/audit'
     | '/admin/users'
@@ -117,6 +128,7 @@ export interface FileRouteTypes {
     | '/guide'
     | '/login'
     | '/register'
+    | '/report'
     | '/settings'
     | '/admin/audit'
     | '/admin/users'
@@ -128,6 +140,7 @@ export interface RootRouteChildren {
   GuideRoute: typeof GuideRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
+  ReportRoute: typeof ReportRoute
   SettingsRoute: typeof SettingsRoute
   AdminAuditRoute: typeof AdminAuditRoute
   AdminUsersRoute: typeof AdminUsersRoute
@@ -162,6 +175,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/report': {
+      id: '/report'
+      path: '/report'
+      fullPath: '/report'
+      preLoaderRoute: typeof ReportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -200,6 +220,7 @@ const rootRouteChildren: RootRouteChildren = {
   GuideRoute: GuideRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
+  ReportRoute: ReportRoute,
   SettingsRoute: SettingsRoute,
   AdminAuditRoute: AdminAuditRoute,
   AdminUsersRoute: AdminUsersRoute,

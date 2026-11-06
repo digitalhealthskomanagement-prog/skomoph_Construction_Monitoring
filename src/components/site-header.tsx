@@ -1,7 +1,17 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { BookOpen, History, Home, KeyRound, LogOut, Menu, Settings2, Users } from "lucide-react";
+import {
+  BookOpen,
+  FileText,
+  History,
+  Home,
+  KeyRound,
+  LogOut,
+  Menu,
+  Settings2,
+  Users,
+} from "lucide-react";
 import hospitalLogo from "@/assets/hospital-logo.png";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,7 +54,7 @@ export function SiteHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-lg">
+    <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-lg print:hidden">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
         <Link to="/" className="flex min-w-0 items-center gap-3">
           <img
@@ -56,8 +66,8 @@ export function SiteHeader() {
           />
           <div className="min-w-0 leading-tight">
             <div className="truncate font-display text-sm font-semibold tracking-tight sm:text-base">
-              <span className="lg:hidden">สสจ.สระแก้ว</span>
-              <span className="hidden lg:inline">สำนักงานสาธารณสุขจังหวัดสระแก้ว</span>
+              <span className="xl:hidden">สสจ.สระแก้ว</span>
+              <span className="hidden xl:inline">สำนักงานสาธารณสุขจังหวัดสระแก้ว</span>
             </div>
             <div className="truncate text-xs text-muted-foreground">
               ระบบติดตามความคืบหน้างานก่อสร้าง
@@ -66,7 +76,7 @@ export function SiteHeader() {
         </Link>
 
         {/* Desktop navigation */}
-        <nav className="hidden items-center gap-1 md:flex lg:gap-2">
+        <nav className="hidden items-center gap-1 lg:flex xl:gap-2">
           <Link
             to="/"
             className={desktopLink}
@@ -81,6 +91,13 @@ export function SiteHeader() {
             activeProps={{ className: "text-foreground font-semibold" }}
           >
             <BookOpen className="size-4" /> คู่มือการใช้งาน
+          </Link>
+          <Link
+            to="/report"
+            className={`${desktopLink} inline-flex items-center gap-1.5`}
+            activeProps={{ className: "text-foreground font-semibold" }}
+          >
+            <FileText className="size-4" /> รายงาน
           </Link>
           {unlocked ? (
             <div className="ml-2 flex items-center gap-2">
@@ -111,7 +128,7 @@ export function SiteHeader() {
                   </Link>
                 </>
               )}
-              <span className="hidden rounded-full border border-brand/20 bg-brand-soft px-2.5 py-1 text-xs font-medium text-primary lg:inline-flex">
+              <span className="hidden rounded-full border border-brand/20 bg-brand-soft px-2.5 py-1 text-xs font-medium text-primary 2xl:inline-flex">
                 โหมดแก้ไข
               </span>
               <Button variant="outline" size="sm" onClick={onLock}>
@@ -137,7 +154,7 @@ export function SiteHeader() {
             <Button
               variant="outline"
               size="icon"
-              className="size-11 shrink-0 md:hidden"
+              className="size-11 shrink-0 lg:hidden"
               aria-label="เปิดเมนู"
             >
               <Menu className="size-5" />
@@ -163,6 +180,11 @@ export function SiteHeader() {
               <SheetClose asChild>
                 <Link to="/guide" className={mobileLink}>
                   <BookOpen className="size-5" /> คู่มือการใช้งาน
+                </Link>
+              </SheetClose>
+              <SheetClose asChild>
+                <Link to="/report" className={mobileLink}>
+                  <FileText className="size-5" /> รายงานสรุป / พิมพ์
                 </Link>
               </SheetClose>
               {unlocked && (
