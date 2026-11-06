@@ -11,6 +11,7 @@ import { saveEvent, deleteEvent } from "@/lib/data.functions";
 import { toast } from "sonner";
 import { ymd } from "@/lib/thai-date";
 import type { CalEvent } from "./calendar-grid";
+import { mutationErrorMessage } from "@/lib/mutation-error";
 
 const TYPES = [
   { v: "task", l: "งาน" },
@@ -25,12 +26,14 @@ export function EventDialog({
   event,
   defaultDate,
   phases,
+  projectId,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   event: CalEvent | null;
   defaultDate: Date | null;
   phases: { id: string; name: string }[];
+  projectId: string;
 }) {
   const qc = useQueryClient();
   const save = useServerFn(saveEvent);
@@ -70,9 +73,10 @@ export function EventDialog({
         type: type as "task" | "milestone" | "meeting" | "inspection",
         phase_id: phaseId === "none" ? null : phaseId,
         note: note.trim() || null,
+        project_id: projectId,
       } });
       if (!result.ok) {
-        toast.error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง");
+        toast.error(mutationErrorMessage(result.reason));
         return;
       }
       toast.success(event ? "แก้ไขแล้ว" : "เพิ่มรายการแล้ว");
@@ -88,7 +92,7 @@ export function EventDialog({
     if (!confirm("ลบรายการนี้?")) return;
     const result = await del({ data: { id: event.id } });
     if (!result.ok) {
-      toast.error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง");
+      toast.error(mutationErrorMessage(result.reason));
       return;
     }
     toast.success("ลบแล้ว");

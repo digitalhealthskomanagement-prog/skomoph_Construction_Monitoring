@@ -13,6 +13,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { ImagePlus, Send, Trash2, X } from "lucide-react";
 import { formatThaiDate } from "@/lib/thai-date";
+import { mutationErrorMessage } from "@/lib/mutation-error";
 
 const MAX_IMAGES = 4;
 
@@ -79,7 +80,7 @@ async function makeThumbnail(file: File): Promise<Blob> {
   return resizeToBlob(img, 480, 0.62);
 }
 
-async function compressImage(file: File): Promise<{ blob: Blob; ext: string }> {
+export async function compressImage(file: File): Promise<{ blob: Blob; ext: string }> {
   const isJpgPng = /image\/(jpeg|png)/i.test(file.type);
   if (file.size < MAX_UPLOAD_BYTES && isJpgPng) {
     return { blob: file, ext: file.type === "image/png" ? "png" : "jpg" };
@@ -108,7 +109,7 @@ async function compressImage(file: File): Promise<{ blob: Blob; ext: string }> {
   throw new Error("รูปใหญ่เกินไป กรุณาเลือกรูปที่เล็กลง");
 }
 
-export function UpdateComposer({ phases }: { phases: Phase[] }) {
+export function UpdateComposer({ phases, projectId }: { phases: Phase[]; projectId: string }) {
   const qc = useQueryClient();
   const post = useServerFn(postUpdate);
   const createUpload = useServerFn(createUpdateImageUpload);
@@ -148,7 +149,7 @@ export function UpdateComposer({ phases }: { phases: Phase[] }) {
         const exts = [...compressed.map((c) => c.ext), ...thumbs.map(() => "jpg")];
         const uploadTicket = await createUpload({ data: { exts } });
         if (!uploadTicket.ok) {
-          toast.error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง");
+          toast.error(mutationErrorMessage(uploadTicket.reason));
           return;
         }
         const n = compressed.length;
@@ -175,11 +176,12 @@ export function UpdateComposer({ phases }: { phases: Phase[] }) {
         body: body.trim(),
         reporter_name: name.trim() || null,
         phase_id: phaseId === "none" ? null : phaseId,
+        project_id: projectId,
         image_paths,
         thumb_paths,
       } });
       if (!result.ok) {
-        toast.error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง");
+        toast.error(mutationErrorMessage(result.reason));
         return;
       }
       toast.success("โพสต์อัปเดตแล้ว");
@@ -285,7 +287,7 @@ export function UpdatesList({ updates, phases, editable }: { updates: Update[]; 
     if (!confirm("ลบโพสต์นี้?")) return;
     const result = await del({ data: { id } });
     if (!result.ok) {
-      toast.error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง");
+      toast.error(mutationErrorMessage(result.reason));
       return;
     }
     toast.success("ลบแล้ว");
