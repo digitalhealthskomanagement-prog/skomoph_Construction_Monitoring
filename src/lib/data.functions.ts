@@ -17,6 +17,17 @@ async function admin() {
 const storagePath = z.string().regex(/^(hero\/)?\d+-[a-z0-9]{1,8}\.(jpg|png)$/);
 const idInput = z.object({ id: z.string().uuid() });
 
+// YYYY-MM-DD for "today" in Thailand, regardless of the server's time zone
+function bangkokToday(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
+}
+
+function addDays(isoDate: string, days: number): string {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 // Every project the request touches must belong to the caller: the project of the
 // existing record (when updating/deleting by id) AND any project/phase given in the
 // payload. Trusting the payload alone would let a unit admin edit or move records
@@ -79,12 +90,38 @@ export const getAllProjectsData = createServerFn({ method: "GET" }).handler(asyn
     }
     
     const projects = data ?? [];
+
+    // Projects without a cover image fall back to their latest photo update. Fetch
+    // those photos in one query for all such projects instead of one query each.
+    const needFallback = projects.filter((d: any) => !d.hero_image_path).map((d: any) => d.id);
+    const latestPhoto = new Map<string, { image_url: string | null; image_urls: string[] | null }>();
+    if (needFallback.length > 0) {
+      const { data: photoUpdates, error: photoError } = await sb
+        .from("updates")
+        .select("project_id, image_url, image_urls, thumb_urls, created_at")
+        .in("project_id", needFallback)
+        .or("image_url.not.is.null,image_urls.neq.{}")
+        .order("created_at", { ascending: false })
+        .limit(2000);
+      if (photoError) console.error("getAllProjectsData photos error:", photoError);
+      for (const u of photoUpdates ?? []) {
+        if (!latestPhoto.has(u.project_id)) {
+          // Prefer the small thumbnail for the card grid when one exists
+          const thumbs = (u as { thumb_urls?: string[] | null }).thumb_urls;
+          latestPhoto.set(u.project_id, {
+            image_url: thumbs?.[0] ?? u.image_url,
+            image_urls: thumbs && thumbs.length > 0 ? thumbs : u.image_urls,
+          });
+        }
+      }
+    }
+
     return Promise.all(projects.map(async (d: any) => {
       let heroUrl = await signImage(d.hero_image_path ?? null);
       if (!heroUrl) {
-        const { data: latestUpdate } = await sb.from("updates").select("image_url, image_urls").eq("project_id", d.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
-        if (latestUpdate) {
-          const signed = await signImages(latestUpdate.image_urls, latestUpdate.image_url);
+        const photo = latestPhoto.get(d.id);
+        if (photo) {
+          const signed = await signImages(photo.image_urls, photo.image_url);
           heroUrl = signed[0] ?? null;
         }
       }
@@ -557,35 +594,58 @@ export const createProject = createServerFn({ method: "POST" })
       return { ok: false as const, reason: "forbidden" as const };
     }
     
+    // Standard e-bidding preparation steps: [code, name, duration in days]. Dates are
+    // laid out back to back starting today (Thai time), instead of fixed 2026 dates.
+    const prepSteps: [string, string, number][] = [
+      ["1.1", "เสนอแต่งตั้งคณะกรรมการกำหนดขอบเขตงาน (TOR) และราคากลาง", 5],
+      ["1.2", "คณะกรรมการฯ จัดทำแบบรูปรายการและราคากลาง", 20],
+      ["1.3", "เสนอรายงานผลราคากลาง และขอความเห็นชอบ", 1],
+      ["1.4", "จัดทำรายงานขอซื้อขอจ้าง พร้อมแต่งตั้งคณะกรรมการพิจารณาผลฯ", 6],
+      ["1.5", "เผยแพร่ร่างประกาศเพื่อรับฟังคำวิจารณ์ (7 วันทำการ)", 11],
+      ["1.6", "รายงานผลรับฟังความคิดเห็น และผู้บริหารลงนามประกาศเชิญชวน", 1],
+      ["1.7", "เผยแพร่ประกาศประกวดราคา e-bidding (20 วันทำการ)", 28],
+      ["1.8", "ผู้เสนอราคายื่นข้อเสนอทางระบบอิเล็กทรอนิกส์", 1],
+      ["1.9", "คณะกรรมการพิจารณาผลการประกวดราคาฯ", 5],
+      ["1.10", "รายงานผลการพิจารณาให้ผู้มีอำนาจลงนาม", 1],
+      ["1.11", "ประกาศผู้ชนะการเสนอราคา", 1],
+      ["1.12", "เว้นระยะเวลาอุทธรณ์ (7 วันทำการ)", 11],
+      ["1.13", "รายงานผลอุทธรณ์ / เสนอผู้บริหารเรียกทำสัญญา", 1],
+      ["1.14", "ผู้รับจ้างเตรียมหลักประกัน และตรวจสอบเอกสารเพื่อลงนาม", 17],
+      ["1.15", "ผู้มีอำนาจลงนามสัญญาจ้างก่อสร้าง (เริ่มต้นนับเวลาก่อสร้าง)", 1],
+    ];
+    const today = bangkokToday();
+    let cursor = today;
+    const defaultPhaseRows = prepSteps.map(([code, name, days], i) => {
+      const startDate = cursor;
+      const endDate = addDays(startDate, days - 1);
+      cursor = addDays(endDate, 1);
+      return {
+        category: "preparation",
+        code,
+        name,
+        order: 101 + i,
+        color: "#0ea5e9",
+        duration_label: `${days} วัน`,
+        start_date: startDate,
+        end_date: endDate,
+        progress: 0,
+      };
+    });
+    const lastPrepEnd = defaultPhaseRows[defaultPhaseRows.length - 1].end_date;
+
     const sb = await admin();
     const { data: proj, error } = await sb.from("projects").insert({
       title: data.title,
       unit_id: data.unitId,
-      start_date: new Date().toISOString().split("T")[0],
-      end_date: new Date().toISOString().split("T")[0],
+      start_date: today,
+      end_date: lastPrepEnd,
       is_active: true,
     }).select("id").single();
     if (error || !proj) throw error ? dbError(error) : new Error("สร้างโครงการไม่สำเร็จ");
 
-    // Insert default preparation phases
-    const defaultPhases = [
-      { category: 'preparation', code: '1.1', name: 'เสนอแต่งตั้งคณะกรรมการกำหนดขอบเขตงาน (TOR) และราคากลาง', order: 101, color: '#0ea5e9', duration_label: '5 วัน', start_date: '2026-09-01', end_date: '2026-09-05', project_id: proj.id, progress: 0 },
-      { category: 'preparation', code: '1.2', name: 'คณะกรรมการฯ จัดทำแบบรูปรายการและราคากลาง', order: 102, color: '#0ea5e9', duration_label: '20 วัน', start_date: '2026-09-06', end_date: '2026-09-25', project_id: proj.id, progress: 0 },
-      { category: 'preparation', code: '1.3', name: 'เสนอรายงานผลราคากลาง และขอความเห็นชอบ', order: 103, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-09-26', end_date: '2026-09-26', project_id: proj.id, progress: 0 },
-      { category: 'preparation', code: '1.4', name: 'จัดทำรายงานขอซื้อขอจ้าง พร้อมแต่งตั้งคณะกรรมการพิจารณาผลฯ', order: 104, color: '#0ea5e9', duration_label: '6 วัน', start_date: '2026-09-27', end_date: '2026-10-02', project_id: proj.id, progress: 0 },
-      { category: 'preparation', code: '1.5', name: 'เผยแพร่ร่างประกาศเพื่อรับฟังคำวิจารณ์ (7 วันทำการ)', order: 105, color: '#0ea5e9', duration_label: '11 วัน', start_date: '2026-10-03', end_date: '2026-10-13', project_id: proj.id, progress: 0 },
-      { category: 'preparation', code: '1.6', name: 'รายงานผลรับฟังความคิดเห็น และผู้บริหารลงนามประกาศเชิญชวน', order: 106, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-10-14', end_date: '2026-10-14', project_id: proj.id, progress: 0 },
-      { category: 'preparation', code: '1.7', name: 'เผยแพร่ประกาศประกวดราคา e-bidding (20 วันทำการ)', order: 107, color: '#0ea5e9', duration_label: '28 วัน', start_date: '2026-10-15', end_date: '2026-11-11', project_id: proj.id, progress: 0 },
-      { category: 'preparation', code: '1.8', name: 'ผู้เสนอราคายื่นข้อเสนอทางระบบอิเล็กทรอนิกส์', order: 108, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-11-12', end_date: '2026-11-12', project_id: proj.id, progress: 0 },
-      { category: 'preparation', code: '1.9', name: 'คณะกรรมการพิจารณาผลการประกวดราคาฯ', order: 109, color: '#0ea5e9', duration_label: '5 วัน', start_date: '2026-11-13', end_date: '2026-11-17', project_id: proj.id, progress: 0 },
-      { category: 'preparation', code: '1.10', name: 'รายงานผลการพิจารณาให้ผู้มีอำนาจลงนาม', order: 110, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-11-18', end_date: '2026-11-18', project_id: proj.id, progress: 0 },
-      { category: 'preparation', code: '1.11', name: 'ประกาศผู้ชนะการเสนอราคา', order: 111, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-11-19', end_date: '2026-11-19', project_id: proj.id, progress: 0 },
-      { category: 'preparation', code: '1.12', name: 'เว้นระยะเวลาอุทธรณ์ (7 วันทำการ)', order: 112, color: '#0ea5e9', duration_label: '11 วัน', start_date: '2026-11-20', end_date: '2026-11-30', project_id: proj.id, progress: 0 },
-      { category: 'preparation', code: '1.13', name: 'รายงานผลอุทธรณ์ / เสนอผู้บริหารเรียกทำสัญญา', order: 113, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-12-01', end_date: '2026-12-01', project_id: proj.id, progress: 0 },
-      { category: 'preparation', code: '1.14', name: 'ผู้รับจ้างเตรียมหลักประกัน และตรวจสอบเอกสารเพื่อลงนาม', order: 114, color: '#0ea5e9', duration_label: '17 วัน', start_date: '2026-12-02', end_date: '2026-12-18', project_id: proj.id, progress: 0 },
-      { category: 'preparation', code: '1.15', name: 'ผู้มีอำนาจลงนามสัญญาจ้างก่อสร้าง (เริ่มต้นนับเวลาก่อสร้าง)', order: 115, color: '#0ea5e9', duration_label: '1 วัน', start_date: '2026-12-19', end_date: '2026-12-19', project_id: proj.id, progress: 0 },
-    ];
-    await sb.from("phases").insert(defaultPhases);
+    const defaultPhases = defaultPhaseRows.map((row) => ({ ...row, project_id: proj.id }));
+    const { error: phaseError } = await sb.from("phases").insert(defaultPhases);
+    if (phaseError) throw dbError(phaseError);
 
     return { ok: true as const };
   });
