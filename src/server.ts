@@ -44,18 +44,45 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+// Security headers for every page and server-function response. The CSP only sets
+// directives that cannot break the app (framing, plugins, base/form targets); a full
+// script-src policy would need nonces for TanStack's inline hydration scripts.
+const SECURITY_HEADERS: Record<string, string> = {
+  "Content-Security-Policy":
+    "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com https://*.supabase.co",
+  "X-Frame-Options": "DENY",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+};
+
+function withSecurityHeaders(response: Response): Response {
+  // Some responses (e.g. redirects from fetch) have immutable headers; copy if needed
+  let res = response;
+  try {
+    for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.headers.set(k, v);
+  } catch {
+    res = new Response(response.body, response);
+    for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.headers.set(k, v);
+  }
+  return res;
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return withSecurityHeaders(await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      return withSecurityHeaders(
+        new Response(renderErrorPage(), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+      );
     }
   },
 };

@@ -1,7 +1,7 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { BookOpen, Home, KeyRound, LogOut, Menu, Settings2, Users } from "lucide-react";
+import { BookOpen, History, Home, KeyRound, LogOut, Menu, Settings2, Users } from "lucide-react";
 import hospitalLogo from "@/assets/hospital-logo.png";
 import { Button } from "@/components/ui/button";
 import {
@@ -94,13 +94,22 @@ export function SiteHeader() {
                 </span>
               </Link>
               {isSuperAdmin && (
-                <Link
-                  to="/admin/users"
-                  className={desktopLink}
-                  activeProps={{ className: "text-foreground" }}
-                >
-                  จัดการผู้ใช้
-                </Link>
+                <>
+                  <Link
+                    to="/admin/users"
+                    className={desktopLink}
+                    activeProps={{ className: "text-foreground" }}
+                  >
+                    จัดการผู้ใช้
+                  </Link>
+                  <Link
+                    to="/admin/audit"
+                    className={desktopLink}
+                    activeProps={{ className: "text-foreground" }}
+                  >
+                    ประวัติ
+                  </Link>
+                </>
               )}
               <span className="hidden rounded-full border border-brand/20 bg-brand-soft px-2.5 py-1 text-xs font-medium text-primary lg:inline-flex">
                 โหมดแก้ไข
@@ -167,6 +176,13 @@ export function SiteHeader() {
                 <SheetClose asChild>
                   <Link to="/admin/users" className={mobileLink}>
                     <Users className="size-5" /> จัดการผู้ใช้
+                  </Link>
+                </SheetClose>
+              )}
+              {unlocked && isSuperAdmin && (
+                <SheetClose asChild>
+                  <Link to="/admin/audit" className={mobileLink}>
+                    <History className="size-5" /> ประวัติการแก้ไขข้อมูล
                   </Link>
                 </SheetClose>
               )}
