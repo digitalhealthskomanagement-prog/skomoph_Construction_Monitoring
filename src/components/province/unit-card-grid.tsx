@@ -136,7 +136,8 @@ export function UnitCardGrid({
           {filteredProjects.map((project) => (
             <Link
               key={project.id}
-              to={`/projects/${project.id}`}
+              to="/projects/$projectId"
+              params={{ projectId: project.id }}
               className="group bg-white rounded-2xl border border-neutral-100 overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 flex flex-col h-full"
             >
               <div className="aspect-[4/3] bg-neutral-100 relative overflow-hidden">
@@ -146,6 +147,8 @@ export function UnitCardGrid({
                     "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?auto=format&fit=crop&w=1600&q=80"
                   }
                   alt={project.title}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
                 <div className="absolute top-3 left-3 flex gap-2">

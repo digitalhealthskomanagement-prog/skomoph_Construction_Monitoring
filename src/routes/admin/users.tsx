@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getAllUsers, updateUserRole, approveUser, deleteUser } from "@/lib/admin.functions";
 import { getAllUnitsData } from "@/lib/data.functions";
+import { SiteHeader } from "@/components/site-header";
 import {
   Table,
   TableBody,
@@ -159,13 +160,21 @@ function AdminUsersPage() {
     setIsEditDialogOpen(true);
   };
 
-  if (isLoadingUsers) return <div className="p-8 text-center">กำลังโหลดข้อมูลผู้ใช้...</div>;
+  if (isLoadingUsers)
+    return (
+      <>
+        <SiteHeader />
+        <div className="p-8 text-center">กำลังโหลดข้อมูลผู้ใช้...</div>
+      </>
+    );
 
   const pendingCount =
     usersData?.users.filter((u) => !u.is_approved && u.has_submitted_registration).length || 0;
 
   return (
-    <div className="container mx-auto max-w-6xl p-6">
+    <>
+    <SiteHeader />
+    <div className="container mx-auto max-w-6xl p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">จัดการผู้ใช้งาน (User Management)</h1>
@@ -370,6 +379,7 @@ function AdminUsersPage() {
         />
       )}
     </div>
+    </>
   );
 }
 
